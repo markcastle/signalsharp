@@ -1,6 +1,19 @@
 # SignalSharp 🔐
 
-SignalSharp is a minimal viable implementation of the Signal protocol in C#. It provides end-to-end encryption capabilities while adhering to SOLID principles and maintaining high test coverage.
+SignalSharp is a C# implementation of the Signal Protocol, providing end-to-end encryption for secure messaging applications. It enables developers to add robust encryption capabilities to their applications, ensuring messages remain private and secure even if intercepted.
+
+The library implements the same cryptographic protocols used by Signal, WhatsApp, and other secure messaging applications, including:
+- X3DH for secure key exchange
+- Double Ratchet for message encryption with perfect forward secrecy
+- Secure key storage and management
+- Protection against message replay and man-in-the-middle attacks
+
+SignalSharp is designed to be easy to integrate into existing applications while maintaining the highest security standards. It's perfect for applications that need to ensure message privacy, such as:
+- Secure chat applications
+- Private messaging systems
+- Encrypted data transfer
+- Secure IoT communication
+- Enterprise secure messaging
 
 ## ✨ Features
 
