@@ -1,6 +1,11 @@
 # SignalSharp Development Tasks
 
 ## Current Tasks
+- [ ] Add documentation and examples
+- [ ] Security audit
+- [ ] Performance optimization
+
+## Completed Tasks
 - [x] Implement Double Ratchet algorithm (2024-04-06)
   - [x] Implement DoubleRatchetService
   - [x] Add support for session initialization
@@ -11,12 +16,12 @@
   - [x] Implement message decryption in SessionManager
   - [x] Add proper MAC verification
   - [x] Add comprehensive unit tests
-- [ ] Add key storage and retrieval
-- [ ] Add documentation and examples
-- [ ] Security audit
-- [ ] Performance optimization
-
-## Completed Tasks
+- [x] Add key storage and retrieval (2024-04-06)
+  - [x] Implement secure key generation
+  - [x] Add proper key cleanup
+  - [x] Add better error handling for missing keys
+  - [x] Add key versioning support
+  - [x] Add comprehensive unit tests
 - [x] Implement X3DH key agreement protocol (2024-04-06)
   - [x] Implement X3DHKeyAgreementService
   - [x] Add support for identity, signed prekey, and one-time prekey generation
@@ -49,29 +54,28 @@
   - [x] Add comprehensive unit tests for session management
 
 ## Discovered During Work
-- Need to implement secure key generation in SignalSharp.Security
-- Need to implement secure key storage in SignalSharp.Storage
-- Need to implement session state management in SignalSharp.Core
-- Need to improve error handling in FileSessionManager for missing keys
-- Need to implement proper key cleanup in FileKeyStore
-- Need to add unit tests for JSON serialization implementations
-- Need to implement message encryption/decryption in SessionManager
-- Need to implement proper key exchange in GenerateEphemeralKeyPairAsync
-- Need to implement Double Ratchet algorithm for forward secrecy
-- Need to add proper key rotation in X3DH implementation
-- Need to implement message authentication in encryption/decryption
-- Need to add proper error handling for key agreement failures
+- Need to implement secure key generation in SignalSharp.Security ✓
+- Need to implement secure key storage in SignalSharp.Storage ✓
+- Need to implement session state management in SignalSharp.Core ✓
+- Need to improve error handling in FileSessionManager for missing keys ✓
+- Need to implement proper key cleanup in FileKeyStore ✓
+- Need to add unit tests for JSON serialization implementations ✓
+- Need to implement message encryption/decryption in SessionManager ✓
+- Need to implement proper key exchange in GenerateEphemeralKeyPairAsync ✓
+- Need to implement Double Ratchet algorithm for forward secrecy ✓
+- Need to add proper key rotation in X3DH implementation ✓
+- Need to implement message authentication in encryption/decryption ✓
+- Need to add proper error handling for key agreement failures ✓
 - Need to implement proper chain key derivation in DoubleRatchetService ✓
 - Need to add message skipping prevention in DoubleRatchetService ✓
 - Need to implement proper session state cleanup ✓
 - Need to add proper error handling for invalid message MACs ✓
-- Need to add proper error handling for missing keys
-- Need to add proper error handling for invalid session states
-- Need to add proper error handling for invalid message formats
-- Need to add proper error handling for invalid key formats
+- Need to add proper error handling for missing keys ✓
+- Need to add proper error handling for invalid session states ✓
+- Need to add proper error handling for invalid message formats ✓
+- Need to add proper error handling for invalid key formats ✓
 
 ## Future Tasks
-- [ ] Add key storage and retrieval
 - [ ] Add documentation and examples
 - [ ] Security audit
 - [ ] Performance optimization

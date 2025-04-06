@@ -46,43 +46,52 @@ namespace SignalSharp.Core.Services
             if (remotePreKey == null) throw new ArgumentNullException(nameof(remotePreKey));
             if (remotePreKeySignature == null) throw new ArgumentNullException(nameof(remotePreKeySignature));
 
-            // Generate local identity key if not exists
-            var localIdentityKey = await _keyStore.GetKeyAsync("local_identity_key");
-            if (localIdentityKey == null)
+            try
             {
-                var (publicKey, privateKey) = await _keyExchangeService.GenerateKeyPairAsync();
-                await _keyStore.StoreKeyAsync("local_identity_key", publicKey);
-                await _keyStore.StoreKeyAsync("local_identity_private_key", privateKey);
-                localIdentityKey = publicKey;
+                // Generate local identity key if not exists
+                var localIdentityKey = await _keyStore.GetKeyAsync("local_identity_key");
+                if (localIdentityKey == null)
+                {
+                    var (publicKey, privateKey) = await _keyExchangeService.GenerateKeyPairAsync();
+                    await _keyStore.StoreKeyAsync("local_identity_key", publicKey);
+                    await _keyStore.StoreKeyAsync("local_identity_private_key", privateKey);
+                    localIdentityKey = publicKey;
+                }
+
+                // Perform X3DH key agreement
+                var (rootKey, sendingChainKey, receivingChainKey) = await _keyExchangeService.PerformKeyExchangeAsync(
+                    localIdentityKey,
+                    remoteIdentityKey,
+                    remotePreKey);
+
+                // Generate ratchet keys
+                var (sendingRatchetKey, _) = await _keyExchangeService.GenerateKeyPairAsync();
+                var (receivingRatchetKey, _) = await _keyExchangeService.GenerateKeyPairAsync();
+
+                // Store keys
+                await _keyStore.StoreKeyAsync("root_key", rootKey);
+                await _keyStore.StoreKeyAsync("sending_chain_key", sendingChainKey);
+                await _keyStore.StoreKeyAsync("receiving_chain_key", receivingChainKey);
+                await _keyStore.StoreKeyAsync("sending_ratchet_key", sendingRatchetKey);
+                await _keyStore.StoreKeyAsync("receiving_ratchet_key", receivingRatchetKey);
+
+                // Create the session state
+                var sessionState = await _doubleRatchetService.InitializeSessionAsync(
+                    rootKey,
+                    sendingRatchetKey,
+                    receivingRatchetKey);
+
+                // Store the session state
+                await _keyStore.StoreSessionStateAsync(sessionState.SessionId, sessionState);
+
+                return sessionState.SessionId;
             }
-
-            // Perform X3DH key agreement
-            var (rootKey, sendingChainKey, receivingChainKey) = await _keyExchangeService.PerformKeyExchangeAsync(
-                localIdentityKey,
-                remoteIdentityKey,
-                remotePreKey);
-
-            // Generate ratchet keys
-            var (sendingRatchetKey, _) = await _keyExchangeService.GenerateKeyPairAsync();
-            var (receivingRatchetKey, _) = await _keyExchangeService.GenerateKeyPairAsync();
-
-            // Store keys
-            await _keyStore.StoreKeyAsync("root_key", rootKey);
-            await _keyStore.StoreKeyAsync("sending_chain_key", sendingChainKey);
-            await _keyStore.StoreKeyAsync("receiving_chain_key", receivingChainKey);
-            await _keyStore.StoreKeyAsync("sending_ratchet_key", sendingRatchetKey);
-            await _keyStore.StoreKeyAsync("receiving_ratchet_key", receivingRatchetKey);
-
-            // Create the session state
-            var sessionState = await _doubleRatchetService.InitializeSessionAsync(
-                rootKey,
-                sendingRatchetKey,
-                receivingRatchetKey);
-
-            // Store the session state
-            await _keyStore.StoreSessionStateAsync(sessionState.SessionId, sessionState);
-
-            return sessionState.SessionId;
+            catch (Exception ex)
+            {
+                // Clean up any keys that might have been created
+                await CleanupSessionKeysAsync();
+                throw new InvalidOperationException("Failed to create session", ex);
+            }
         }
 
         /// <inheritdoc/>
@@ -91,28 +100,35 @@ namespace SignalSharp.Core.Services
             if (string.IsNullOrEmpty(sessionId)) throw new ArgumentNullException(nameof(sessionId));
             if (message == null) throw new ArgumentNullException(nameof(message));
 
-            // Get the session state
-            var sessionState = await _keyStore.GetSessionStateAsync(sessionId);
-            if (sessionState == null)
+            try
             {
-                throw new InvalidOperationException($"Session not found: {sessionId}");
+                // Get the session state
+                var sessionState = await _keyStore.GetSessionStateAsync(sessionId);
+                if (sessionState == null)
+                {
+                    throw new InvalidOperationException($"Session not found: {sessionId}");
+                }
+
+                // Deserialize the signal message
+                var signalMessage = new SignalMessage(
+                    message, // Content
+                    new byte[32], // MAC (placeholder)
+                    new byte[16], // IV (placeholder)
+                    sessionState.RemoteIdentityKey,
+                    sessionState.ReceivingRatchetKey);
+
+                // Decrypt the message
+                var (decryptedMessage, updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
+
+                // Update the session state
+                await _keyStore.StoreSessionStateAsync(sessionId, updatedState);
+
+                return decryptedMessage;
             }
-
-            // Deserialize the signal message
-            var signalMessage = new SignalMessage(
-                message, // Content
-                new byte[32], // MAC (placeholder)
-                new byte[16], // IV (placeholder)
-                sessionState.RemoteIdentityKey,
-                sessionState.ReceivingRatchetKey);
-
-            // Decrypt the message
-            var (decryptedMessage, updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
-
-            // Update the session state
-            await _keyStore.StoreSessionStateAsync(sessionId, updatedState);
-
-            return decryptedMessage;
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to process incoming message for session {sessionId}", ex);
+            }
         }
 
         /// <inheritdoc/>
@@ -121,21 +137,28 @@ namespace SignalSharp.Core.Services
             if (string.IsNullOrEmpty(sessionId)) throw new ArgumentNullException(nameof(sessionId));
             if (message == null) throw new ArgumentNullException(nameof(message));
 
-            // Get the session state
-            var sessionState = await _keyStore.GetSessionStateAsync(sessionId);
-            if (sessionState == null)
+            try
             {
-                throw new InvalidOperationException($"Session not found: {sessionId}");
+                // Get the session state
+                var sessionState = await _keyStore.GetSessionStateAsync(sessionId);
+                if (sessionState == null)
+                {
+                    throw new InvalidOperationException($"Session not found: {sessionId}");
+                }
+
+                // Encrypt the message
+                var (signalMessage, updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
+
+                // Update the session state
+                await _keyStore.StoreSessionStateAsync(sessionId, updatedState);
+
+                // Return the encrypted message
+                return signalMessage.Content;
             }
-
-            // Encrypt the message
-            var (signalMessage, updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
-
-            // Update the session state
-            await _keyStore.StoreSessionStateAsync(sessionId, updatedState);
-
-            // Return the encrypted message
-            return signalMessage.Content;
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to encrypt message for session {sessionId}", ex);
+            }
         }
 
         /// <inheritdoc/>
@@ -143,8 +166,38 @@ namespace SignalSharp.Core.Services
         {
             if (string.IsNullOrEmpty(sessionId)) throw new ArgumentNullException(nameof(sessionId));
 
-            // Delete the session state
-            await _keyStore.DeleteSessionStateAsync(sessionId);
+            try
+            {
+                // Delete the session state
+                await _keyStore.DeleteSessionStateAsync(sessionId);
+
+                // Clean up session-specific keys
+                await _keyStore.DeleteKeyAsync($"root_key_{sessionId}");
+                await _keyStore.DeleteKeyAsync($"sending_chain_key_{sessionId}");
+                await _keyStore.DeleteKeyAsync($"receiving_chain_key_{sessionId}");
+                await _keyStore.DeleteKeyAsync($"sending_ratchet_key_{sessionId}");
+                await _keyStore.DeleteKeyAsync($"receiving_ratchet_key_{sessionId}");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to delete session {sessionId}", ex);
+            }
+        }
+
+        private async Task CleanupSessionKeysAsync()
+        {
+            try
+            {
+                await _keyStore.DeleteKeyAsync("root_key");
+                await _keyStore.DeleteKeyAsync("sending_chain_key");
+                await _keyStore.DeleteKeyAsync("receiving_chain_key");
+                await _keyStore.DeleteKeyAsync("sending_ratchet_key");
+                await _keyStore.DeleteKeyAsync("receiving_ratchet_key");
+            }
+            catch (Exception)
+            {
+                // Log the error but don't throw, as this is cleanup code
+            }
         }
     }
 } 
