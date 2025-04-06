@@ -5,7 +5,7 @@ namespace SignalSharp.Core.Models
     /// <summary>
     /// Represents an encrypted message in the Signal protocol.
     /// </summary>
-    public class SignalMessage
+    public class SignalMessage : IEquatable<SignalMessage>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SignalMessage"/> class.
@@ -27,6 +27,19 @@ namespace SignalSharp.Core.Models
             Iv = iv ?? throw new ArgumentNullException(nameof(iv));
             SenderIdentityKey = senderIdentityKey ?? throw new ArgumentNullException(nameof(senderIdentityKey));
             SenderEphemeralKey = senderEphemeralKey ?? throw new ArgumentNullException(nameof(senderEphemeralKey));
+
+            if (content.Length == 0)
+                throw new ArgumentException("Content cannot be empty.", nameof(content));
+            if (mac.Length == 0)
+                throw new ArgumentException("MAC cannot be empty.", nameof(mac));
+            if (iv.Length == 0)
+                throw new ArgumentException("IV cannot be empty.", nameof(iv));
+            if (senderIdentityKey.Length == 0)
+                throw new ArgumentException("Sender identity key cannot be empty.", nameof(senderIdentityKey));
+            if (senderEphemeralKey.Length == 0)
+                throw new ArgumentException("Sender ephemeral key cannot be empty.", nameof(senderEphemeralKey));
+
+            Type = MessageType.Regular;
         }
 
         /// <summary>
@@ -68,6 +81,74 @@ namespace SignalSharp.Core.Models
         /// Gets or sets the previous counter value.
         /// </summary>
         public uint PreviousCounter { get; set; }
+
+        /// <summary>
+        /// Determines whether the specified object is equal to the current object.
+        /// </summary>
+        /// <param name="other">The object to compare with the current object.</param>
+        /// <returns>true if the specified object is equal to the current object; otherwise, false.</returns>
+        public bool Equals(SignalMessage other)
+        {
+            if (ReferenceEquals(null, other)) return false;
+            if (ReferenceEquals(this, other)) return true;
+
+            return Type == other.Type &&
+                   Content.AsSpan().SequenceEqual(other.Content) &&
+                   Mac.AsSpan().SequenceEqual(other.Mac) &&
+                   Iv.AsSpan().SequenceEqual(other.Iv) &&
+                   SenderIdentityKey.AsSpan().SequenceEqual(other.SenderIdentityKey) &&
+                   SenderEphemeralKey.AsSpan().SequenceEqual(other.SenderEphemeralKey) &&
+                   Counter == other.Counter &&
+                   PreviousCounter == other.PreviousCounter;
+        }
+
+        /// <summary>
+        /// Determines whether the specified object is equal to the current object.
+        /// </summary>
+        /// <param name="obj">The object to compare with the current object.</param>
+        /// <returns>true if the specified object is equal to the current object; otherwise, false.</returns>
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != GetType()) return false;
+            return Equals((SignalMessage)obj);
+        }
+
+        /// <summary>
+        /// Gets a hash code for the current object.
+        /// </summary>
+        /// <returns>A hash code for the current object.</returns>
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add((int)Type);
+            foreach (var b in Content)
+                hash.Add(b);
+            foreach (var b in Mac)
+                hash.Add(b);
+            foreach (var b in Iv)
+                hash.Add(b);
+            foreach (var b in SenderIdentityKey)
+                hash.Add(b);
+            foreach (var b in SenderEphemeralKey)
+                hash.Add(b);
+            hash.Add(Counter);
+            hash.Add(PreviousCounter);
+            return hash.ToHashCode();
+        }
+
+        public static bool operator ==(SignalMessage left, SignalMessage right)
+        {
+            if (ReferenceEquals(left, null))
+                return ReferenceEquals(right, null);
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(SignalMessage left, SignalMessage right)
+        {
+            return !(left == right);
+        }
     }
 
     /// <summary>
