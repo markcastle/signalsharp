@@ -81,7 +81,7 @@ namespace SignalSharp.Tests.Security
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                _service.ComputeSharedSecretAsync(null, publicKey));
+                _service.ComputeSharedSecretAsync(null!, publicKey));
         }
 
         [Fact]
@@ -92,7 +92,7 @@ namespace SignalSharp.Tests.Security
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                _service.ComputeSharedSecretAsync(privateKey, null));
+                _service.ComputeSharedSecretAsync(privateKey, null!));
         }
 
         [Fact]
@@ -100,7 +100,7 @@ namespace SignalSharp.Tests.Security
         {
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                _service.DeriveSymmetricKeyAsync(null));
+                _service.DeriveSymmetricKeyAsync(null!));
         }
     }
 } 

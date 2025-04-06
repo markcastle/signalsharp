@@ -68,7 +68,7 @@ namespace SignalSharp.Tests.Security
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                _service.EncryptAsync(null, key));
+                _service.EncryptAsync(null!, key));
         }
 
         [Fact]
@@ -79,22 +79,19 @@ namespace SignalSharp.Tests.Security
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                _service.EncryptAsync(plainText, null));
+                _service.EncryptAsync(plainText, null!));
         }
 
         [Fact]
-        public async Task DecryptAsync_WithInvalidKey_ShouldProduceDifferentResult()
+        public async Task DecryptAsync_WithInvalidKey_ShouldThrowCryptographicException()
         {
             // Arrange
             var key1 = await _service.GenerateKeyAsync();
             var key2 = await _service.GenerateKeyAsync();
-            var originalText = "Hello, Signal!";
-            var plainText = Encoding.UTF8.GetBytes(originalText);
-
-            // Act
+            var plainText = Encoding.UTF8.GetBytes("Hello, Signal!");
             var encrypted = await _service.EncryptAsync(plainText, key1);
 
-            // Assert
+            // Act & Assert
             await Assert.ThrowsAsync<CryptographicException>(() => 
                 _service.DecryptAsync(encrypted, key2));
         }
@@ -104,7 +101,7 @@ namespace SignalSharp.Tests.Security
         {
             // Arrange
             var key = await _service.GenerateKeyAsync();
-            var invalidCipherText = new byte[8]; // Too short to contain IV
+            var invalidCipherText = new byte[] { 1, 2, 3, 4, 5 }; // Too short to be valid
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(() => 
