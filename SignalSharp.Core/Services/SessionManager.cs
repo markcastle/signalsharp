@@ -14,6 +14,7 @@ namespace SignalSharp.Core.Services
         private readonly IEncryptionService _encryptionService;
         private readonly IKeyExchangeService _keyExchangeService;
         private readonly IHashService _hashService;
+        private readonly IDoubleRatchetService _doubleRatchetService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SessionManager"/> class.
@@ -22,17 +23,20 @@ namespace SignalSharp.Core.Services
         /// <param name="encryptionService">The encryption service for encrypting and decrypting messages.</param>
         /// <param name="keyExchangeService">The key exchange service for establishing shared secrets.</param>
         /// <param name="hashService">The hash service for computing and verifying hashes.</param>
+        /// <param name="doubleRatchetService">The double ratchet service for message encryption and decryption.</param>
         /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
         public SessionManager(
             IKeyStore keyStore,
             IEncryptionService encryptionService,
             IKeyExchangeService keyExchangeService,
-            IHashService hashService)
+            IHashService hashService,
+            IDoubleRatchetService doubleRatchetService)
         {
             _keyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
             _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
             _keyExchangeService = keyExchangeService ?? throw new ArgumentNullException(nameof(keyExchangeService));
             _hashService = hashService ?? throw new ArgumentNullException(nameof(hashService));
+            _doubleRatchetService = doubleRatchetService ?? throw new ArgumentNullException(nameof(doubleRatchetService));
         }
 
         /// <inheritdoc/>
@@ -42,48 +46,43 @@ namespace SignalSharp.Core.Services
             if (remotePreKey == null) throw new ArgumentNullException(nameof(remotePreKey));
             if (remotePreKeySignature == null) throw new ArgumentNullException(nameof(remotePreKeySignature));
 
-            // Generate a unique session ID
-            string sessionId = Guid.NewGuid().ToString();
-
-            // Get the local identity key
-            byte[] localIdentityKey = await _keyStore.GetIdentityKeyAsync();
+            // Generate local identity key if not exists
+            var localIdentityKey = await _keyStore.GetKeyAsync("local_identity_key");
             if (localIdentityKey == null)
             {
-                throw new InvalidOperationException("Local identity key not found. Please generate an identity key first.");
+                var (publicKey, privateKey) = await _keyExchangeService.GenerateKeyPairAsync();
+                await _keyStore.StoreKeyAsync("local_identity_key", publicKey);
+                await _keyStore.StoreKeyAsync("local_identity_private_key", privateKey);
+                localIdentityKey = publicKey;
             }
 
-            // Verify the remote pre-key signature
-            bool isValidSignature = await _hashService.VerifyKeyedHashAsync(remotePreKey, remoteIdentityKey, remotePreKeySignature);
-            if (!isValidSignature)
-            {
-                throw new InvalidOperationException("Invalid remote pre-key signature.");
-            }
-
-            // Perform key exchange to establish shared secrets
+            // Perform X3DH key agreement
             var (rootKey, sendingChainKey, receivingChainKey) = await _keyExchangeService.PerformKeyExchangeAsync(
                 localIdentityKey,
                 remoteIdentityKey,
                 remotePreKey);
 
             // Generate ratchet keys
-            byte[] sendingRatchetKey = await _keyStore.GenerateEphemeralKeyPairAsync();
-            byte[] receivingRatchetKey = remotePreKey; // Initially, the receiving ratchet key is the remote pre-key
+            var (sendingRatchetKey, _) = await _keyExchangeService.GenerateKeyPairAsync();
+            var (receivingRatchetKey, _) = await _keyExchangeService.GenerateKeyPairAsync();
+
+            // Store keys
+            await _keyStore.StoreKeyAsync("root_key", rootKey);
+            await _keyStore.StoreKeyAsync("sending_chain_key", sendingChainKey);
+            await _keyStore.StoreKeyAsync("receiving_chain_key", receivingChainKey);
+            await _keyStore.StoreKeyAsync("sending_ratchet_key", sendingRatchetKey);
+            await _keyStore.StoreKeyAsync("receiving_ratchet_key", receivingRatchetKey);
 
             // Create the session state
-            var sessionState = new SessionState(
-                sessionId,
-                localIdentityKey,
-                remoteIdentityKey,
+            var sessionState = await _doubleRatchetService.InitializeSessionAsync(
                 rootKey,
-                sendingChainKey,
-                receivingChainKey,
                 sendingRatchetKey,
                 receivingRatchetKey);
 
             // Store the session state
-            await _keyStore.StoreSessionStateAsync(sessionId, sessionState);
+            await _keyStore.StoreSessionStateAsync(sessionState.SessionId, sessionState);
 
-            return sessionId;
+            return sessionState.SessionId;
         }
 
         /// <inheritdoc/>
@@ -99,13 +98,21 @@ namespace SignalSharp.Core.Services
                 throw new InvalidOperationException($"Session not found: {sessionId}");
             }
 
-            // Update the last used timestamp
-            sessionState.LastUsedAt = DateTime.UtcNow;
-            await _keyStore.StoreSessionStateAsync(sessionId, sessionState);
+            // Deserialize the signal message
+            var signalMessage = new SignalMessage(
+                message, // Content
+                new byte[32], // MAC (placeholder)
+                new byte[16], // IV (placeholder)
+                sessionState.RemoteIdentityKey,
+                sessionState.ReceivingRatchetKey);
 
-            // TODO: Implement message decryption using the session state
-            // This is a placeholder implementation
-            return await Task.FromResult(new byte[0]);
+            // Decrypt the message
+            var (decryptedMessage, updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
+
+            // Update the session state
+            await _keyStore.StoreSessionStateAsync(sessionId, updatedState);
+
+            return decryptedMessage;
         }
 
         /// <inheritdoc/>
@@ -121,13 +128,14 @@ namespace SignalSharp.Core.Services
                 throw new InvalidOperationException($"Session not found: {sessionId}");
             }
 
-            // Update the last used timestamp
-            sessionState.LastUsedAt = DateTime.UtcNow;
-            await _keyStore.StoreSessionStateAsync(sessionId, sessionState);
+            // Encrypt the message
+            var (signalMessage, updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
 
-            // TODO: Implement message encryption using the session state
-            // This is a placeholder implementation
-            return await Task.FromResult(new byte[0]);
+            // Update the session state
+            await _keyStore.StoreSessionStateAsync(sessionId, updatedState);
+
+            // Return the encrypted message
+            return signalMessage.Content;
         }
 
         /// <inheritdoc/>

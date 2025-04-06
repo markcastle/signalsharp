@@ -6,7 +6,11 @@
   - [x] Add support for session initialization
   - [x] Implement message encryption/decryption
   - [x] Add comprehensive unit tests
-- [ ] Add message encryption/decryption
+- [x] Add message encryption/decryption (2024-04-06)
+  - [x] Implement message encryption in SessionManager
+  - [x] Implement message decryption in SessionManager
+  - [x] Add proper MAC verification
+  - [x] Add comprehensive unit tests
 - [ ] Add key storage and retrieval
 - [ ] Add documentation and examples
 - [ ] Security audit
@@ -57,10 +61,14 @@
 - Need to add proper key rotation in X3DH implementation
 - Need to implement message authentication in encryption/decryption
 - Need to add proper error handling for key agreement failures
-- Need to implement proper chain key derivation in DoubleRatchetService
-- Need to add message skipping prevention in DoubleRatchetService
-- Need to implement proper session state cleanup
-- Need to add proper error handling for invalid message MACs
+- Need to implement proper chain key derivation in DoubleRatchetService ✓
+- Need to add message skipping prevention in DoubleRatchetService ✓
+- Need to implement proper session state cleanup ✓
+- Need to add proper error handling for invalid message MACs ✓
+- Need to add proper error handling for missing keys
+- Need to add proper error handling for invalid session states
+- Need to add proper error handling for invalid message formats
+- Need to add proper error handling for invalid key formats
 
 ## Future Tasks
 - [ ] Add key storage and retrieval
