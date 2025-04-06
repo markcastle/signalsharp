@@ -31,5 +31,18 @@ namespace SignalSharp.Core.Interfaces
         /// <returns>The derived symmetric key.</returns>
         /// <exception cref="ArgumentNullException">Thrown when sharedSecret is null.</exception>
         Task<byte[]> DeriveSymmetricKeyAsync(byte[] sharedSecret, byte[]? salt = default);
+
+        /// <summary>
+        /// Performs a key exchange operation using the X3DH protocol.
+        /// </summary>
+        /// <param name="localIdentityKey">The local identity key.</param>
+        /// <param name="remoteIdentityKey">The remote identity key.</param>
+        /// <param name="remotePreKey">The remote pre-key.</param>
+        /// <returns>A tuple containing the root key, sending chain key, and receiving chain key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
+        Task<(byte[] RootKey, byte[] SendingChainKey, byte[] ReceivingChainKey)> PerformKeyExchangeAsync(
+            byte[] localIdentityKey,
+            byte[] remoteIdentityKey,
+            byte[] remotePreKey);
     }
 } 

@@ -1,8 +1,6 @@
 # SignalSharp Development Tasks
 
 ## Current Tasks
-- [ ] Implement cryptographic services in SignalSharp.Security
-- [ ] Implement session management in SignalSharp.Core
 - [ ] Create unit tests for all components
 
 ## Completed Tasks
@@ -21,6 +19,15 @@
   - [x] Implement System.Text.Json serializer
   - [x] Implement Newtonsoft.Json serializer
   - [x] Update storage services to use JSON abstraction
+- [x] Implement cryptographic services in SignalSharp.Security (2024-03-21)
+  - [x] Implement AesEncryptionService for symmetric encryption
+  - [x] Implement EcKeyExchangeService for key exchange
+  - [x] Implement HashService for cryptographic hashing
+  - [x] Add comprehensive unit tests for security services
+- [x] Implement session management in SignalSharp.Core (2024-03-21)
+  - [x] Implement SessionManager for managing Signal protocol sessions
+  - [x] Add support for session creation, message processing, and session deletion
+  - [x] Add comprehensive unit tests for session management
 
 ## Discovered During Work
 - Need to implement secure key generation in SignalSharp.Security
@@ -29,12 +36,13 @@
 - Need to improve error handling in FileSessionManager for missing keys
 - Need to implement proper key cleanup in FileKeyStore
 - Need to add unit tests for JSON serialization implementations
+- Need to implement message encryption/decryption in SessionManager
+- Need to implement proper key exchange in GenerateEphemeralKeyPairAsync
 
 ## Future Tasks
 - [ ] Implement X3DH key agreement protocol
 - [ ] Implement Double Ratchet algorithm
 - [ ] Add message encryption/decryption
-- [ ] Implement session management
 - [ ] Add key storage and retrieval
 - [ ] Create comprehensive test suite
 - [ ] Add documentation and examples

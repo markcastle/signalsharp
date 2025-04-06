@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using SignalSharp.Core.Models;
 
 namespace SignalSharp.Core.Interfaces
 {
@@ -40,5 +41,42 @@ namespace SignalSharp.Core.Interfaces
         /// <returns>True if the key exists, false otherwise.</returns>
         /// <exception cref="ArgumentNullException">Thrown when keyId is null.</exception>
         Task<bool> KeyExistsAsync(string keyId);
+
+        /// <summary>
+        /// Gets the identity key.
+        /// </summary>
+        /// <returns>The identity key, or null if not found.</returns>
+        Task<byte[]> GetIdentityKeyAsync();
+
+        /// <summary>
+        /// Generates a new ephemeral key pair.
+        /// </summary>
+        /// <returns>The generated ephemeral key pair.</returns>
+        Task<byte[]> GenerateEphemeralKeyPairAsync();
+
+        /// <summary>
+        /// Stores a session state.
+        /// </summary>
+        /// <param name="sessionId">The identifier for the session.</param>
+        /// <param name="sessionState">The session state to store.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when sessionId or sessionState is null.</exception>
+        Task StoreSessionStateAsync(string sessionId, SessionState sessionState);
+
+        /// <summary>
+        /// Gets a session state by its identifier.
+        /// </summary>
+        /// <param name="sessionId">The identifier of the session state to retrieve.</param>
+        /// <returns>The retrieved session state, or null if not found.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when sessionId is null.</exception>
+        Task<SessionState> GetSessionStateAsync(string sessionId);
+
+        /// <summary>
+        /// Deletes a session state by its identifier.
+        /// </summary>
+        /// <param name="sessionId">The identifier of the session state to delete.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when sessionId is null.</exception>
+        Task DeleteSessionStateAsync(string sessionId);
     }
 } 

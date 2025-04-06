@@ -89,6 +89,50 @@ namespace SignalSharp.Security.Services
             });
         }
 
+        /// <summary>
+        /// Performs a key exchange operation using the X3DH protocol.
+        /// </summary>
+        /// <param name="localIdentityKey">The local identity key.</param>
+        /// <param name="remoteIdentityKey">The remote identity key.</param>
+        /// <param name="remotePreKey">The remote pre-key.</param>
+        /// <returns>A tuple containing the root key, sending chain key, and receiving chain key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
+        public async Task<(byte[] RootKey, byte[] SendingChainKey, byte[] ReceivingChainKey)> PerformKeyExchangeAsync(
+            byte[] localIdentityKey,
+            byte[] remoteIdentityKey,
+            byte[] remotePreKey)
+        {
+            if (localIdentityKey == null) throw new ArgumentNullException(nameof(localIdentityKey));
+            if (remoteIdentityKey == null) throw new ArgumentNullException(nameof(remoteIdentityKey));
+            if (remotePreKey == null) throw new ArgumentNullException(nameof(remotePreKey));
+
+            // Generate ephemeral key pair
+            var (ephemeralPublicKey, ephemeralPrivateKey) = await GenerateKeyPairAsync();
+
+            // Compute DH1 = DH(IKa, SPKb)
+            var dh1 = await ComputeSharedSecretAsync(localIdentityKey, remotePreKey);
+
+            // Compute DH2 = DH(EKa, IKb)
+            var dh2 = await ComputeSharedSecretAsync(ephemeralPrivateKey, remoteIdentityKey);
+
+            // Compute DH3 = DH(EKa, SPKb)
+            var dh3 = await ComputeSharedSecretAsync(ephemeralPrivateKey, remotePreKey);
+
+            // Concatenate shared secrets
+            var sharedSecret = new byte[dh1.Length + dh2.Length + dh3.Length];
+            Buffer.BlockCopy(dh1, 0, sharedSecret, 0, dh1.Length);
+            Buffer.BlockCopy(dh2, 0, sharedSecret, dh1.Length, dh2.Length);
+            Buffer.BlockCopy(dh3, 0, sharedSecret, dh1.Length + dh2.Length, dh3.Length);
+
+            // Derive root key and chain keys
+            var hkdf = new HKDF(sharedSecret, GenerateSalt());
+            var rootKey = hkdf.DeriveKey(32);
+            var sendingChainKey = hkdf.DeriveKey(32);
+            var receivingChainKey = hkdf.DeriveKey(32);
+
+            return (rootKey, sendingChainKey, receivingChainKey);
+        }
+
         private byte[] GenerateSalt()
         {
             var salt = new byte[32];
