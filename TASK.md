@@ -1,9 +1,12 @@
 # SignalSharp Development Tasks
 
 ## Current Tasks
-- [ ] Create unit tests for all components
+- [ ] Implement X3DH key agreement protocol
+- [ ] Implement Double Ratchet algorithm
+- [ ] Add message encryption/decryption
 
 ## Completed Tasks
+- [x] Create unit tests for all components (2024-04-06)
 - [x] Create solution and project structure (2024-03-19)
 - [x] Create PLANNING.md (2024-03-19)
 - [x] Create TASK.md (2024-03-19)
@@ -40,11 +43,7 @@
 - Need to implement proper key exchange in GenerateEphemeralKeyPairAsync
 
 ## Future Tasks
-- [ ] Implement X3DH key agreement protocol
-- [ ] Implement Double Ratchet algorithm
-- [ ] Add message encryption/decryption
 - [ ] Add key storage and retrieval
-- [ ] Create comprehensive test suite
 - [ ] Add documentation and examples
 - [ ] Security audit
 - [ ] Performance optimization
