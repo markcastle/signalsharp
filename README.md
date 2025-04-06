@@ -6,17 +6,21 @@ SignalSharp is a minimal viable implementation of the Signal protocol in C#. It 
 
 - 🔒 End-to-end encryption using modern cryptographic primitives
 - 🤝 X3DH key agreement protocol with identity, signed prekey, and one-time prekey support
-- 🔄 Double Ratchet algorithm for forward secrecy
+- 🔄 Double Ratchet algorithm for forward secrecy and message encryption
 - 💾 Secure key storage and management
 - 📦 .NET Standard 2.1 compliant
 - 🔌 Flexible JSON serialization with pluggable providers
 - ✅ Comprehensive test coverage with 100+ unit tests
+- 🔐 Message authentication with MAC verification
+- 🔑 Automatic key rotation and ratcheting
+- 🛡️ Protection against message skipping attacks
 
 ## 🏗️ Project Structure
 
 - **SignalSharp.Core**: Core protocol logic and interfaces
 - **SignalSharp.Security**: Cryptographic operations and key management
   - X3DH key agreement implementation
+  - Double Ratchet implementation
   - Hash and encryption services
 - **SignalSharp.Storage**: Persistent storage of keys and sessions
 - **SignalSharp.Serialization.SystemTextJson**: System.Text.Json implementation
@@ -41,31 +45,21 @@ SignalSharp is a minimal viable implementation of the Signal protocol in C#. It 
 ```csharp
 // Initialize dependencies
 var keyStore = new FileKeyStore("./keys");
-var encryptionService = new EncryptionService();
-var jsonSerializer = new SystemTextJsonSerializer();
-var x3dhService = new X3DHKeyAgreementService(
-    new HashService(),
-    new EcKeyExchangeService());
-
-// Generate identity and prekeys
-var identityKeyPair = await x3dhService.GenerateIdentityKeyPairAsync();
-var signedPreKeyPair = await x3dhService.GenerateSignedPreKeyPairAsync(identityKeyPair);
-var oneTimePreKeyPair = await x3dhService.GenerateOneTimePreKeyPairAsync();
-
-// Perform X3DH key agreement
-var sharedSecret = await x3dhService.PerformKeyAgreementAsync(
-    initiatorIdentityKey,
-    initiatorEphemeralKey,
-    recipientIdentityKey,
-    recipientSignedPreKey,
-    recipientOneTimePreKey);
+var encryptionService = new AesEncryptionService();
+var hashService = new HashService();
+var keyExchangeService = new EcKeyExchangeService();
+var doubleRatchetService = new DoubleRatchetService(
+    encryptionService,
+    keyExchangeService,
+    hashService);
 
 // Create a session manager
-var sessionManager = new FileSessionManager(
-    "./sessions",
+var sessionManager = new SessionManager(
     keyStore,
     encryptionService,
-    jsonSerializer);
+    keyExchangeService,
+    hashService,
+    doubleRatchetService);
 
 // Create a new session
 var sessionId = await sessionManager.CreateSessionAsync(
@@ -82,6 +76,9 @@ var encryptedMessage = await sessionManager.EncryptMessageAsync(
 var decryptedMessage = await sessionManager.ProcessIncomingMessageAsync(
     sessionId,
     encryptedMessage);
+
+// Clean up
+await sessionManager.DeleteSessionAsync(sessionId);
 ```
 
 ## 🔒 Security Considerations
@@ -92,9 +89,13 @@ var decryptedMessage = await sessionManager.ProcessIncomingMessageAsync(
 - Memory safety is ensured through proper key handling
 - JSON serialization is abstracted to allow secure implementations
 - X3DH protocol implementation follows Signal Protocol specifications
+- Double Ratchet implementation ensures forward secrecy
+- Message authentication using HMAC-based MAC
+- Protection against message skipping attacks
 - Comprehensive null checks and parameter validation
 - Immutable key pairs and session states
 - Secure key derivation using HMAC-based key derivation
+- Automatic key rotation and ratcheting
 
 ## 🧪 Testing
 
@@ -104,6 +105,9 @@ The project maintains high test coverage with:
 - Security tests for cryptographic operations
 - Mock-based testing for external dependencies
 - Comprehensive edge case and error handling tests
+- Double Ratchet algorithm tests
+- Message encryption/decryption tests
+- MAC verification tests
 
 ## 🤝 Contributing
 
