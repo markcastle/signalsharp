@@ -194,33 +194,122 @@ The project maintains high test coverage with:
 
 ### Component Diagram
 
-```
-+----------------+     +----------------+     +----------------+
-|   SignalSharp  |     |   SignalSharp  |     |   SignalSharp  |
-|     Core       |     |   Security     |     |   Storage      |
-+----------------+     +----------------+     +----------------+
-| - Interfaces   |     | - X3DH         |     | - KeyStore     |
-| - Models       |     | - DoubleRatchet|     | - SessionStore |
-| - Services     |     | - Encryption   |     | - FileStorage  |
-+----------------+     +----------------+     +----------------+
-         |                     |                     |
-         v                     v                     v
-+----------------+     +----------------+     +----------------+
-|   SignalSharp  |     |   SignalSharp  |     |   SignalSharp  |
-| Serialization  |     |     Tests      |     |    Examples    |
-+----------------+     +----------------+     +----------------+
-| - JSON         |     | - Unit Tests   |     | - Usage        |
-| - XML          |     | - Integration  |     | - Samples      |
-+----------------+     +----------------+     +----------------+
+```mermaid
+graph TD
+    subgraph SignalSharp.Core
+        A[Interfaces] --> B[Models]
+        B --> C[Services]
+    end
+    
+    subgraph SignalSharp.Security
+        D[X3DH] --> E[DoubleRatchet]
+        E --> F[Encryption]
+        F --> G[Hash]
+    end
+    
+    subgraph SignalSharp.Storage
+        H[KeyStore] --> I[SessionStore]
+        I --> J[FileStorage]
+    end
+    
+    subgraph SignalSharp.Serialization
+        K[SystemTextJson] --> L[NewtonsoftJson]
+    end
+    
+    subgraph SignalSharp.Tests
+        M[Unit Tests] --> N[Integration Tests]
+        N --> O[Security Tests]
+    end
+    
+    C --> D
+    C --> H
+    C --> K
+    C --> M
 ```
 
 ### Data Flow
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant SessionManager
+    participant DoubleRatchet
+    participant X3DH
+    participant KeyStore
+    
+    Client->>SessionManager: CreateSession(remoteIdentityKey, remotePreKey, remotePreKeySignature)
+    SessionManager->>X3DH: PerformKeyAgreement
+    X3DH->>KeyStore: StoreKeys
+    SessionManager->>DoubleRatchet: InitializeRatchet
+    DoubleRatchet->>KeyStore: StoreChainKeys
+    SessionManager->>Client: Return sessionId
+    
+    Client->>SessionManager: EncryptMessage(sessionId, message)
+    SessionManager->>DoubleRatchet: RatchetStep
+    DoubleRatchet->>KeyStore: UpdateChainKeys
+    SessionManager->>Client: Return encryptedMessage
+    
+    Client->>SessionManager: ProcessIncomingMessage(sessionId, encryptedMessage)
+    SessionManager->>DoubleRatchet: RatchetStep
+    DoubleRatchet->>KeyStore: UpdateChainKeys
+    SessionManager->>Client: Return decryptedMessage
 ```
-[Client] -> [SessionManager] -> [DoubleRatchet] -> [X3DH] -> [KeyStore]
-   ^            |                  |               |           |
-   |            v                  v               v           v
-[Server] <- [SessionManager] <- [DoubleRatchet] <- [X3DH] <- [KeyStore]
+
+### X3DH Key Agreement Protocol
+
+```mermaid
+sequenceDiagram
+    participant Alice
+    participant Bob
+    participant Server
+    
+    Alice->>Server: Request Bob's prekeys
+    Server->>Alice: Return Bob's identity key, signed prekey, and one-time prekey
+    
+    Note over Alice: Generate ephemeral key pair
+    Note over Alice: Perform X3DH key agreement
+    Note over Alice: Derive root key and ratchet key
+    
+    Alice->>Bob: Send initial message with ephemeral key
+    Note over Bob: Perform X3DH key agreement
+    Note over Bob: Derive root key and ratchet key
+    
+    Note over Alice,Bob: Both parties now have the same shared secret
+```
+
+### Double Ratchet Algorithm
+
+```mermaid
+graph TD
+    A[Root Key] --> B[Initialize Ratchet]
+    B --> C[Sending Chain]
+    B --> D[Receiving Chain]
+    
+    C --> E[Message Key 1]
+    C --> F[Message Key 2]
+    C --> G[Message Key N]
+    
+    D --> H[Message Key 1]
+    D --> I[Message Key 2]
+    D --> J[Message Key N]
+    
+    K[Ratchet Step] --> L[New Chain Key]
+    L --> M[New Message Key]
+    
+    N[Ratchet Key Exchange] --> O[New Root Key]
+    O --> P[New Sending Chain]
+    O --> Q[New Receiving Chain]
+```
+
+### Session State Management
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initialized: CreateSession
+    Initialized --> Active: First message
+    Active --> Ratcheting: Message count threshold
+    Ratcheting --> Active: New chain keys derived
+    Active --> [*]: DeleteSession
 ```
 
 ## 🤝 Contributing
