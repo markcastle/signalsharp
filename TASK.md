@@ -2,30 +2,35 @@
 
 ## Current Tasks
 - [ ] Add documentation and examples
+  - [x] Update README.md with detailed examples
+  - [x] Add troubleshooting guide
+  - [x] Add architecture diagrams
+  - [x] Add XML documentation to core service implementations
+  - [ ] Create comprehensive API documentation
 - [ ] Security audit
 - [ ] Performance optimization
 
 ## Completed Tasks
-- [x] Implement Double Ratchet algorithm (2024-04-06)
-  - [x] Implement DoubleRatchetService
-  - [x] Add support for session initialization
-  - [x] Implement message encryption/decryption
-  - [x] Add comprehensive unit tests
-- [x] Add message encryption/decryption (2024-04-06)
-  - [x] Implement message encryption in SessionManager
-  - [x] Implement message decryption in SessionManager
-  - [x] Add proper MAC verification
-  - [x] Add comprehensive unit tests
 - [x] Add key storage and retrieval (2024-04-06)
   - [x] Implement secure key generation
   - [x] Add proper key cleanup
   - [x] Add better error handling for missing keys
   - [x] Add key versioning support
   - [x] Add comprehensive unit tests
-- [x] Implement X3DH key agreement protocol (2024-04-06)
-  - [x] Implement X3DHKeyAgreementService
-  - [x] Add support for identity, signed prekey, and one-time prekey generation
-  - [x] Implement key agreement protocol
+- [x] Add message encryption/decryption (2024-04-06)
+  - [x] Implement message encryption in SessionManager
+  - [x] Implement message decryption in SessionManager
+  - [x] Add proper MAC verification
+  - [x] Add comprehensive unit tests
+- [x] Implement Double Ratchet algorithm (2024-04-05)
+  - [x] Create DoubleRatchetService
+  - [x] Implement key derivation
+  - [x] Implement ratcheting
+  - [x] Add comprehensive unit tests
+- [x] Implement X3DH key agreement protocol (2024-04-04)
+  - [x] Create X3DHKeyAgreementService
+  - [x] Implement key generation
+  - [x] Implement key exchange
   - [x] Add comprehensive unit tests
 - [x] Create unit tests for all components (2024-04-06)
 - [x] Create solution and project structure (2024-03-19)
@@ -54,26 +59,12 @@
   - [x] Add comprehensive unit tests for session management
 
 ## Discovered During Work
-- Need to implement secure key generation in SignalSharp.Security ✓
-- Need to implement secure key storage in SignalSharp.Storage ✓
-- Need to implement session state management in SignalSharp.Core ✓
-- Need to improve error handling in FileSessionManager for missing keys ✓
-- Need to implement proper key cleanup in FileKeyStore ✓
-- Need to add unit tests for JSON serialization implementations ✓
-- Need to implement message encryption/decryption in SessionManager ✓
-- Need to implement proper key exchange in GenerateEphemeralKeyPairAsync ✓
-- Need to implement Double Ratchet algorithm for forward secrecy ✓
-- Need to add proper key rotation in X3DH implementation ✓
-- Need to implement message authentication in encryption/decryption ✓
-- Need to add proper error handling for key agreement failures ✓
-- Need to implement proper chain key derivation in DoubleRatchetService ✓
-- Need to add message skipping prevention in DoubleRatchetService ✓
-- Need to implement proper session state cleanup ✓
-- Need to add proper error handling for invalid message MACs ✓
-- Need to add proper error handling for missing keys ✓
-- Need to add proper error handling for invalid session states ✓
-- Need to add proper error handling for invalid message formats ✓
-- Need to add proper error handling for invalid key formats ✓
+- [x] Need for secure key generation and storage
+- [x] Need for proper session state management
+- [x] Need for better error handling in key operations
+- [ ] Need for performance optimization in key operations
+- [ ] Need for better logging and monitoring
+- [ ] Need for better error messages and debugging
 
 ## Future Tasks
 - [ ] Add documentation and examples

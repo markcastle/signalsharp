@@ -6,9 +6,15 @@ using SignalSharp.Core.Models;
 namespace SignalSharp.Security.Services
 {
     /// <summary>
-    /// Implements the Double Ratchet algorithm for the Signal protocol.
-    /// This service handles continuous key rotation and message encryption/decryption.
+    /// Implements the Double Ratchet algorithm for secure messaging with forward secrecy.
     /// </summary>
+    /// <remarks>
+    /// The Double Ratchet algorithm provides:
+    /// - Forward secrecy through key rotation
+    /// - Protection against message replay attacks
+    /// - Protection against message skipping attacks
+    /// - Perfect forward secrecy through ratcheting
+    /// </remarks>
     public class DoubleRatchetService : IDoubleRatchetService
     {
         private readonly IEncryptionService _encryptionService;
@@ -16,11 +22,12 @@ namespace SignalSharp.Security.Services
         private readonly IHashService _hashService;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DoubleRatchetService"/> class.
+        /// Initializes a new instance of the DoubleRatchetService class.
         /// </summary>
-        /// <param name="encryptionService">The encryption service.</param>
-        /// <param name="keyExchangeService">The key exchange service.</param>
-        /// <param name="hashService">The hash service.</param>
+        /// <param name="encryptionService">The encryption service used for message encryption/decryption.</param>
+        /// <param name="keyExchangeService">The key exchange service used for ratchet key generation.</param>
+        /// <param name="hashService">The hash service used for key derivation.</param>
+        /// <exception cref="ArgumentNullException">Thrown when any of the parameters are null.</exception>
         public DoubleRatchetService(
             IEncryptionService encryptionService,
             IKeyExchangeService keyExchangeService,
@@ -29,6 +36,146 @@ namespace SignalSharp.Security.Services
             _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
             _keyExchangeService = keyExchangeService ?? throw new ArgumentNullException(nameof(keyExchangeService));
             _hashService = hashService ?? throw new ArgumentNullException(nameof(hashService));
+        }
+
+        /// <summary>
+        /// Initializes a new ratchet session with the provided parameters.
+        /// </summary>
+        /// <param name="rootKey">The root key for the session.</param>
+        /// <param name="remoteRatchetKey">The remote party's ratchet public key.</param>
+        /// <param name="isInitiator">Whether this party initiated the session.</param>
+        /// <returns>A tuple containing the sending and receiving chain keys.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when rootKey or remoteRatchetKey is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when rootKey or remoteRatchetKey is empty.</exception>
+        public async Task<(byte[] sendingChainKey, byte[] receivingChainKey)> InitializeRatchetAsync(
+            byte[] rootKey,
+            byte[] remoteRatchetKey,
+            bool isInitiator)
+        {
+            if (rootKey == null) throw new ArgumentNullException(nameof(rootKey));
+            if (remoteRatchetKey == null) throw new ArgumentNullException(nameof(remoteRatchetKey));
+            if (rootKey.Length == 0) throw new ArgumentException("Root key cannot be empty", nameof(rootKey));
+            if (remoteRatchetKey.Length == 0) throw new ArgumentException("Remote ratchet key cannot be empty", nameof(remoteRatchetKey));
+
+            // Generate a new ratchet key pair
+            var (ratchetPublicKey, ratchetPrivateKey) = await _keyExchangeService.GenerateKeyPairAsync();
+
+            // Perform key exchange
+            var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(ratchetPrivateKey, remoteRatchetKey);
+
+            // Derive chain keys
+            var (sendingChainKey, receivingChainKey) = await DeriveChainKeysAsync(rootKey, sharedSecret, isInitiator);
+
+            return (sendingChainKey, receivingChainKey);
+        }
+
+        /// <summary>
+        /// Performs a ratchet step to generate new message keys.
+        /// </summary>
+        /// <param name="chainKey">The current chain key.</param>
+        /// <param name="messageNumber">The message number for key derivation.</param>
+        /// <returns>A tuple containing the new chain key and message key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when chainKey is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when chainKey is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when messageNumber is negative.</exception>
+        public async Task<(byte[] newChainKey, byte[] messageKey)> RatchetStepAsync(
+            byte[] chainKey,
+            int messageNumber)
+        {
+            if (chainKey == null) throw new ArgumentNullException(nameof(chainKey));
+            if (chainKey.Length == 0) throw new ArgumentException("Chain key cannot be empty", nameof(chainKey));
+            if (messageNumber < 0) throw new ArgumentOutOfRangeException(nameof(messageNumber), "Message number cannot be negative");
+
+            // Derive message key and new chain key
+            var (newChainKey, messageKey) = await DeriveMessageKeyAsync(chainKey, messageNumber);
+
+            return (newChainKey, messageKey);
+        }
+
+        /// <summary>
+        /// Derives chain keys from the root key and shared secret.
+        /// </summary>
+        /// <param name="rootKey">The root key for key derivation.</param>
+        /// <param name="sharedSecret">The shared secret from key exchange.</param>
+        /// <param name="isInitiator">Whether this party initiated the session.</param>
+        /// <returns>A tuple containing the sending and receiving chain keys.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when rootKey or sharedSecret is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when rootKey or sharedSecret is empty.</exception>
+        private async Task<(byte[] sendingChainKey, byte[] receivingChainKey)> DeriveChainKeysAsync(
+            byte[] rootKey,
+            byte[] sharedSecret,
+            bool isInitiator)
+        {
+            if (rootKey == null) throw new ArgumentNullException(nameof(rootKey));
+            if (sharedSecret == null) throw new ArgumentNullException(nameof(sharedSecret));
+            if (rootKey.Length == 0) throw new ArgumentException("Root key cannot be empty", nameof(rootKey));
+            if (sharedSecret.Length == 0) throw new ArgumentException("Shared secret cannot be empty", nameof(sharedSecret));
+
+            // Derive chain keys based on initiator status
+            var (sendingChainKey, receivingChainKey) = isInitiator
+                ? (await DeriveChainKeyAsync(rootKey, sharedSecret, "sending"),
+                   await DeriveChainKeyAsync(rootKey, sharedSecret, "receiving"))
+                : (await DeriveChainKeyAsync(rootKey, sharedSecret, "receiving"),
+                   await DeriveChainKeyAsync(rootKey, sharedSecret, "sending"));
+
+            return (sendingChainKey, receivingChainKey);
+        }
+
+        /// <summary>
+        /// Derives a chain key from the root key and shared secret.
+        /// </summary>
+        /// <param name="rootKey">The root key for key derivation.</param>
+        /// <param name="sharedSecret">The shared secret from key exchange.</param>
+        /// <param name="purpose">The purpose of the chain key ("sending" or "receiving").</param>
+        /// <returns>The derived chain key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when rootKey or sharedSecret is empty, or purpose is invalid.</exception>
+        private async Task<byte[]> DeriveChainKeyAsync(
+            byte[] rootKey,
+            byte[] sharedSecret,
+            string purpose)
+        {
+            if (rootKey == null) throw new ArgumentNullException(nameof(rootKey));
+            if (sharedSecret == null) throw new ArgumentNullException(nameof(sharedSecret));
+            if (purpose == null) throw new ArgumentNullException(nameof(purpose));
+            if (rootKey.Length == 0) throw new ArgumentException("Root key cannot be empty", nameof(rootKey));
+            if (sharedSecret.Length == 0) throw new ArgumentException("Shared secret cannot be empty", nameof(sharedSecret));
+            if (purpose != "sending" && purpose != "receiving")
+                throw new ArgumentException("Purpose must be either 'sending' or 'receiving'", nameof(purpose));
+
+            // Combine root key and shared secret
+            var combined = new byte[rootKey.Length + sharedSecret.Length];
+            Buffer.BlockCopy(rootKey, 0, combined, 0, rootKey.Length);
+            Buffer.BlockCopy(sharedSecret, 0, combined, rootKey.Length, sharedSecret.Length);
+
+            // Derive chain key using HKDF
+            return await _hashService.DeriveKeyAsync(combined, purpose);
+        }
+
+        /// <summary>
+        /// Derives a message key and new chain key from the current chain key.
+        /// </summary>
+        /// <param name="chainKey">The current chain key.</param>
+        /// <param name="messageNumber">The message number for key derivation.</param>
+        /// <returns>A tuple containing the new chain key and message key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when chainKey is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when chainKey is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when messageNumber is negative.</exception>
+        private async Task<(byte[] newChainKey, byte[] messageKey)> DeriveMessageKeyAsync(
+            byte[] chainKey,
+            int messageNumber)
+        {
+            if (chainKey == null) throw new ArgumentNullException(nameof(chainKey));
+            if (chainKey.Length == 0) throw new ArgumentException("Chain key cannot be empty", nameof(chainKey));
+            if (messageNumber < 0) throw new ArgumentOutOfRangeException(nameof(messageNumber), "Message number cannot be negative");
+
+            // Derive message key
+            var messageKey = await _hashService.DeriveKeyAsync(chainKey, $"message_{messageNumber}");
+
+            // Derive new chain key
+            var newChainKey = await _hashService.DeriveKeyAsync(chainKey, "chain");
+
+            return (newChainKey, messageKey);
         }
 
         /// <inheritdoc/>
@@ -214,13 +361,6 @@ namespace SignalSharp.Security.Services
                 PreviousReceivingMessageNumber = state.ReceivingMessageNumber,
                 LastUsedAt = DateTime.UtcNow
             };
-        }
-
-        private async Task<(byte[] SendingChainKey, byte[] ReceivingChainKey)> DeriveChainKeysAsync(byte[] sharedSecret)
-        {
-            var sendingChainKey = await _keyExchangeService.DeriveSymmetricKeyAsync(sharedSecret);
-            var receivingChainKey = await _keyExchangeService.DeriveSymmetricKeyAsync(sharedSecret);
-            return (sendingChainKey, receivingChainKey);
         }
     }
 } 

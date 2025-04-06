@@ -40,7 +40,9 @@ SignalSharp is a minimal viable implementation of the Signal protocol in C#. It 
 3. Run the tests
 4. Start using the library in your project
 
-## 💻 Usage Example
+## 💻 Usage Examples
+
+### Basic Usage
 
 ```csharp
 // Initialize dependencies
@@ -81,6 +83,49 @@ var decryptedMessage = await sessionManager.ProcessIncomingMessageAsync(
 await sessionManager.DeleteSessionAsync(sessionId);
 ```
 
+### Advanced Usage
+
+#### Custom JSON Serialization
+
+```csharp
+// Using System.Text.Json
+var jsonOptions = new JsonSerializerOptions
+{
+    PropertyNameCaseInsensitive = true,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+};
+var jsonSerializer = new SystemTextJsonSerializer(jsonOptions);
+
+// Using Newtonsoft.Json
+var jsonSettings = new JsonSerializerSettings
+{
+    NullValueHandling = NullValueHandling.Ignore,
+    ContractResolver = new CamelCasePropertyNamesContractResolver()
+};
+var jsonSerializer = new NewtonsoftJsonSerializer(jsonSettings);
+```
+
+#### Custom Key Storage
+
+```csharp
+// Implement your own key storage
+public class CustomKeyStore : IKeyStore
+{
+    public async Task StoreKeyAsync(string keyId, byte[] key)
+    {
+        // Your implementation
+    }
+
+    public async Task<byte[]> GetKeyAsync(string keyId)
+    {
+        // Your implementation
+        return null;
+    }
+
+    // Implement other interface methods
+}
+```
+
 ## 🔒 Security Considerations
 
 - All cryptographic operations use secure random number generation
@@ -108,6 +153,75 @@ The project maintains high test coverage with:
 - Double Ratchet algorithm tests
 - Message encryption/decryption tests
 - MAC verification tests
+
+## 🔧 Troubleshooting Guide
+
+### Common Issues
+
+1. **Key Storage Errors**
+   - Ensure the key storage directory exists and has proper permissions
+   - Check if keys are being properly encrypted before storage
+   - Verify key cleanup is working correctly
+
+2. **Message Encryption/Decryption Failures**
+   - Verify session state is properly maintained
+   - Check if ratchet keys are being properly rotated
+   - Ensure MAC verification is passing
+
+3. **Key Exchange Issues**
+   - Verify identity keys are properly generated and stored
+   - Check pre-key signatures
+   - Ensure proper key derivation in X3DH protocol
+
+### Best Practices
+
+1. **Key Management**
+   - Regularly rotate identity keys
+   - Clean up unused session states
+   - Implement proper key backup strategies
+
+2. **Error Handling**
+   - Always check for null parameters
+   - Implement proper exception handling
+   - Log security-related events
+
+3. **Performance**
+   - Use async/await for all operations
+   - Implement proper cleanup
+   - Monitor memory usage
+
+## 📊 Architecture
+
+### Component Diagram
+
+```
++----------------+     +----------------+     +----------------+
+|   SignalSharp  |     |   SignalSharp  |     |   SignalSharp  |
+|     Core       |     |   Security     |     |   Storage      |
++----------------+     +----------------+     +----------------+
+| - Interfaces   |     | - X3DH         |     | - KeyStore     |
+| - Models       |     | - DoubleRatchet|     | - SessionStore |
+| - Services     |     | - Encryption   |     | - FileStorage  |
++----------------+     +----------------+     +----------------+
+         |                     |                     |
+         v                     v                     v
++----------------+     +----------------+     +----------------+
+|   SignalSharp  |     |   SignalSharp  |     |   SignalSharp  |
+| Serialization  |     |     Tests      |     |    Examples    |
++----------------+     +----------------+     +----------------+
+| - JSON         |     | - Unit Tests   |     | - Usage        |
+| - XML          |     | - Integration  |     | - Samples      |
++----------------+     +----------------+     +----------------+
+```
+
+### Data Flow
+
+```
+[Client] -> [SessionManager] -> [DoubleRatchet] -> [X3DH] -> [KeyStore]
+   ^            |                  |               |           |
+   |            v                  v               v           v
+[Server] <- [SessionManager] <- [DoubleRatchet] <- [X3DH] <- [KeyStore]
+```
 
 ## 🤝 Contributing
 
