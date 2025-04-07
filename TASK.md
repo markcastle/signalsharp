@@ -1,14 +1,90 @@
 # SignalSharp Development Tasks
 
+## Priority Tasks (Critical for Security and Production Readiness)
+
+### High Priority
+- [ ] Security audit
+  - [ ] Review X3DH implementation for cryptographic correctness
+  - [ ] Review Double Ratchet implementation for cryptographic correctness
+  - [ ] Verify key generation and storage security
+  - [ ] Check for potential side-channel attacks
+  - [ ] Verify protection against known attack vectors
+  - [ ] Consider third-party security review
+
+- [ ] Address System.Text.Json vulnerabilities
+  - [ ] Monitor for official fix for GHSA-8g4q-xg66-9fp4
+  - [ ] Evaluate alternative JSON serialization libraries
+  - [ ] Implement additional mitigations if needed
+  - [ ] Update documentation on security considerations
+
+### Medium Priority
+- [ ] Create console test application
+  - [ ] Create SignalSharp.Demo project
+  - [ ] Implement unified application with dual-mode operation
+    - [ ] Add mode selection (sender/receiver)
+    - [ ] Implement identity key and prekey generation
+    - [ ] Add key exchange functionality
+    - [ ] Implement message encryption and decryption
+    - [ ] Add session management for both modes
+  - [ ] Add simple network communication layer
+    - [ ] Implement basic TCP/IP communication
+    - [ ] Add message serialization/deserialization
+  - [ ] Create interactive console UI
+    - [ ] Add command-line interface for sending/receiving messages
+    - [ ] Display messages in real-time
+    - [ ] Show session status and key information
+  - [ ] Add demonstration scenarios
+    - [ ] Basic message exchange between two instances
+    - [ ] Session creation and deletion
+    - [ ] Error handling demonstration
+    - [ ] Performance demonstration
+  - [ ] Document demo application
+    - [ ] Add setup instructions
+    - [ ] Document command-line options
+    - [ ] Add troubleshooting guide
+
+- [ ] Performance optimization
+  - [ ] Profile key operations for bottlenecks
+  - [ ] Optimize cryptographic operations
+  - [ ] Improve key storage and retrieval performance
+  - [ ] Add performance benchmarks
+  - [ ] Document performance characteristics
+
+- [ ] Create comprehensive API documentation
+  - [ ] Generate API reference documentation
+  - [ ] Add code samples for common use cases
+  - [ ] Document best practices and patterns
+  - [ ] Create integration guides for common scenarios
+
+### Lower Priority
+- [ ] Improve error handling and debugging
+  - [ ] Enhance error messages with more context
+  - [ ] Add diagnostic information for troubleshooting
+  - [ ] Create debugging tools for development
+  - [ ] Document common error scenarios and solutions
+
+- [ ] Add logging and monitoring
+  - [ ] Design logging strategy
+  - [ ] Implement structured logging
+  - [ ] Add performance counters
+  - [ ] Create monitoring guidelines
+
 ## Current Tasks
 - [ ] Add documentation and examples
   - [x] Update README.md with detailed examples
   - [x] Add troubleshooting guide
   - [x] Add architecture diagrams
   - [x] Add XML documentation to core service implementations
-  - [ ] Create comprehensive API documentation
+  - [x] Create API Reference document
+  - [x] Create Getting Started guide
+  - [x] Create Integration Guide
+  - [x] Create Best Practices document
+  - [x] Create Security Considerations document
+  - [x] Create Troubleshooting guide
+  - [x] Create Code Samples document
 - [ ] Security audit
 - [ ] Performance optimization
+- [ ] Create console test application
 
 ## Completed Tasks
 - [x] Add key storage and retrieval (2024-04-06)
