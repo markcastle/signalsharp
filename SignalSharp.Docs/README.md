@@ -11,6 +11,7 @@ This directory contains comprehensive API documentation for the SignalSharp libr
 5. [Code Samples](code-samples.md) 💻 - Example code for common scenarios
 6. [Security Considerations](security-considerations.md) 🔒 - Security best practices and considerations
 7. [Troubleshooting](troubleshooting.md) 🔧 - Common issues and solutions
+8. [Unity Integration](unity-integration.md) 🎮 - Guide for integrating with Unity projects
 
 ## 📋 Documentation Structure
 
@@ -23,6 +24,7 @@ The documentation is organized into the following sections:
 - **Code Samples** 💻: Example code for common scenarios, such as key exchange, message encryption, and session management.
 - **Security Considerations** 🔒: Security best practices and considerations when using SignalSharp.
 - **Troubleshooting** 🔧: Common issues and solutions when using SignalSharp.
+- **Unity Integration** 🎮: Comprehensive guide for integrating SignalSharp with Unity projects, including platform-specific considerations and examples.
 
 ## 🤝 Contributing
 

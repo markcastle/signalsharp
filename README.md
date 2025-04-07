@@ -58,6 +58,7 @@ By downloading or using this software, you agree that you are not located in, un
 - 🔐 Message authentication with MAC verification
 - 🔑 Automatic key rotation and ratcheting
 - 🛡️ Protection against message skipping attacks
+- 🎮 Unity integration support with platform-specific optimizations
 
 ## 🏗️ Project Structure
 
@@ -70,12 +71,14 @@ By downloading or using this software, you agree that you are not located in, un
 - **SignalSharp.Serialization.SystemTextJson**: System.Text.Json implementation
 - **SignalSharp.Serialization.NewtonsoftJson**: Newtonsoft.Json implementation
 - **SignalSharp.Tests**: Unit, integration, and security tests
+- **SignalSharp.Docs**: Comprehensive documentation including Unity integration guide
 
 ## 📋 Requirements
 
 - .NET Standard 2.1
 - System.Security.Cryptography
 - xUnit (for testing)
+- Unity 2021.x or later (for Unity integration)
 
 ## 🚀 Getting Started
 
