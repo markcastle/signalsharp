@@ -80,7 +80,8 @@ namespace SignalSharp.DependencyInjection
                 },
                 JsonSerializer = new Core.Options.JsonSerializerConfiguration
                 {
-                    Type = Core.Options.JsonSerializerType.SystemTextJson
+                    Type = Core.Options.JsonSerializerType.Default,
+                    Options = new Core.Options.JsonSerializerOptions()
                 },
                 SessionManager = new Core.Options.SessionManagerOptions
                 {

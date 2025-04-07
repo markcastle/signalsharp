@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using SignalSharp.Core.Models;
 
 namespace SignalSharp.Core.Interfaces
 {

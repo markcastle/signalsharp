@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using SignalSharp.Core.Interfaces;
 using SignalSharp.Core.Models;
+using SignalSharp.Core.Options;
 using SignalSharp.Security.Services;
 using SignalSharp.Storage.Services;
 using SignalSharp.Serialization.SystemTextJson;
@@ -39,16 +40,16 @@ namespace SignalSharp.DependencyInjection
             services.AddSingleton(options);
 
             // Register JSON serializer
-            RegisterJsonSerializer(services, options.JsonSerializerOptions);
+            RegisterJsonSerializer(services, options.JsonSerializer);
 
             // Register key store
-            RegisterKeyStore(services, options.KeyStoreOptions);
+            RegisterKeyStore(services, options.KeyStore);
 
             // Register encryption services
             RegisterEncryptionServices(services);
 
             // Register session manager
-            RegisterSessionManager(services, options.SessionManagerOptions);
+            RegisterSessionManager(services, options.SessionManager);
 
             return services;
         }
@@ -58,7 +59,7 @@ namespace SignalSharp.DependencyInjection
         /// </summary>
         /// <param name="services">The service collection.</param>
         /// <param name="options">The JSON serializer options.</param>
-        private static void RegisterJsonSerializer(IServiceCollection services, JsonSerializerOptions options)
+        private static void RegisterJsonSerializer(IServiceCollection services, JsonSerializerConfiguration options)
         {
             if (options.JsonSerializerFactory != null)
             {
@@ -68,11 +69,9 @@ namespace SignalSharp.DependencyInjection
 
             switch (options.Type)
             {
-                case JsonSerializerType.SystemTextJson:
+                case JsonSerializerType.Default:
+                    // Default to System.Text.Json
                     services.AddSingleton<IJsonSerializer, SystemTextJsonSerializer>();
-                    break;
-                case JsonSerializerType.NewtonsoftJson:
-                    services.AddSingleton<IJsonSerializer, NewtonsoftJsonSerializer>();
                     break;
                 case JsonSerializerType.Custom:
                     throw new InvalidOperationException("Custom JSON serializer type requires a factory to be specified.");

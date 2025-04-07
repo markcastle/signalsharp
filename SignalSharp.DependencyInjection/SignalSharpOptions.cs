@@ -4,6 +4,7 @@ using SignalSharp.Security;
 using SignalSharp.Storage;
 using SignalSharp.Core.Interfaces;
 using SignalSharp.Core.Models;
+using SignalSharp.Core.Options;
 
 namespace SignalSharp.DependencyInjection
 {
@@ -73,6 +74,11 @@ namespace SignalSharp.DependencyInjection
         /// Gets or sets the factory for creating the JSON serializer.
         /// </summary>
         public Func<IServiceProvider, IJsonSerializer> JsonSerializerFactory { get; set; } = null!;
+
+        /// <summary>
+        /// Gets or sets the JSON serializer options.
+        /// </summary>
+        public IJsonSerializerOptions Options { get; set; } = new Core.Options.JsonSerializerOptions();
     }
 
     /// <summary>
@@ -102,14 +108,9 @@ namespace SignalSharp.DependencyInjection
     public enum JsonSerializerType
     {
         /// <summary>
-        /// Use System.Text.Json for serialization.
+        /// Use the default JSON serializer.
         /// </summary>
-        SystemTextJson,
-
-        /// <summary>
-        /// Use Newtonsoft.Json for serialization.
-        /// </summary>
-        NewtonsoftJson,
+        Default,
 
         /// <summary>
         /// Use a custom JSON serializer.

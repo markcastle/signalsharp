@@ -1,7 +1,5 @@
-using System;
-using System.Text.Json;
 using SignalSharp.Core.Interfaces;
-using Newtonsoft.Json;
+using System;
 
 namespace SignalSharp.Core.Options
 {
@@ -60,7 +58,7 @@ namespace SignalSharp.Core.Options
         /// <summary>
         /// Gets or sets the type of JSON serializer to use.
         /// </summary>
-        public JsonSerializerType Type { get; set; } = JsonSerializerType.SystemTextJson;
+        public JsonSerializerType Type { get; set; } = JsonSerializerType.Default;
 
         /// <summary>
         /// Gets or sets the factory for creating JSON serializer instances.
@@ -68,14 +66,9 @@ namespace SignalSharp.Core.Options
         public Func<IServiceProvider, IJsonSerializer>? JsonSerializerFactory { get; set; }
 
         /// <summary>
-        /// Gets or sets the System.Text.Json serializer options.
+        /// Gets or sets the JSON serializer options.
         /// </summary>
-        public System.Text.Json.JsonSerializerOptions? SystemTextJsonOptions { get; set; }
-
-        /// <summary>
-        /// Gets or sets the Newtonsoft.Json serializer settings.
-        /// </summary>
-        public Newtonsoft.Json.JsonSerializerSettings? NewtonsoftJsonSettings { get; set; }
+        public IJsonSerializerOptions Options { get; set; } = new JsonSerializerOptions();
     }
 
     /// <summary>
@@ -121,14 +114,9 @@ namespace SignalSharp.Core.Options
     public enum JsonSerializerType
     {
         /// <summary>
-        /// Use System.Text.Json serializer.
+        /// Use the default JSON serializer.
         /// </summary>
-        SystemTextJson,
-
-        /// <summary>
-        /// Use Newtonsoft.Json serializer.
-        /// </summary>
-        NewtonsoftJson,
+        Default,
 
         /// <summary>
         /// Use a custom JSON serializer implementation.
