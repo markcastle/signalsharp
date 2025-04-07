@@ -429,7 +429,7 @@ namespace SignalSharp.Tests.Storage
         public async Task GetSessionStateAsync_WithExistingState_ShouldReturnState()
         {
             // Arrange
-            string sessionId = "test_session";
+            const string sessionId = "test_session";
             SessionState sessionState = new(
                 sessionId,
                 new byte[] { 1, 2, 3 },
@@ -439,7 +439,7 @@ namespace SignalSharp.Tests.Storage
                 new byte[] { 13, 14, 15 },
                 new byte[] { 16, 17, 18 },
                 new byte[] { 19, 20, 21 });
-            string json = "{}";
+            const string json = "{}";
             _mockJsonSerializer.Setup(x => x.Serialize(sessionState))
                 .Returns(json);
             _mockJsonSerializer.Setup(x => x.Deserialize<SessionState>(json))
