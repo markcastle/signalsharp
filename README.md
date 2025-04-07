@@ -1,5 +1,10 @@
 # SignalSharp 🔐
 
+[![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.1-blue.svg)](https://docs.microsoft.com/en-us/dotnet/standard/net-standard)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/Tests-103%20Passing-brightgreen.svg)](SignalSharp.Tests)
+[![Security](https://img.shields.io/badge/Security-Audit%20Pending-yellow.svg)](TASK.md#security-audit)
+
 SignalSharp is a C# implementation of the Signal Protocol, providing end-to-end encryption for secure messaging applications. It enables developers to add robust encryption capabilities to their applications, ensuring messages remain private and secure even if intercepted.
 
 The library implements the same cryptographic protocols used by Signal, WhatsApp, and other secure messaging applications, including:
@@ -14,6 +19,25 @@ SignalSharp is designed to be easy to integrate into existing applications while
 - Encrypted data transfer
 - Secure IoT communication
 - Enterprise secure messaging
+
+## ⚠️ Important Notice
+
+**This library is currently in development and has not been extensively tested in production environments. While we have comprehensive unit tests and follow security best practices, we recommend:**
+
+- Using this library with caution in production environments
+- Conducting your own security audit before deployment
+- Monitoring for updates and security patches
+- Reporting any issues or concerns through GitHub issues
+
+**NuGet Package Status:**
+- The library is not yet available on NuGet
+- We plan to publish it once we have:
+  - Completed the security audit
+  - Conducted more extensive testing
+  - Received feedback from early adopters
+  - Addressed any identified issues
+
+For now, you can use the library by referencing it directly from GitHub or by building it locally.
 
 ## ✨ Features
 
