@@ -10,10 +10,10 @@
     - [x] Create test vectors from specifications
     - [x] Set up automated testing pipeline
   - [ ] Phase 2: X3DH Protocol Review
-    - [ ] Review key generation and validation
-      - [ ] Verify key length requirements
-      - [ ] Check key generation randomness
-      - [ ] Validate key format
+    - [x] Review key generation and validation
+      - [x] Verify key length requirements
+      - [x] Check key generation randomness
+      - [x] Validate key format
     - [ ] Verify identity key handling
       - [ ] Check identity key persistence
       - [ ] Verify key rotation
