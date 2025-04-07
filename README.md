@@ -39,6 +39,13 @@ SignalSharp is designed to be easy to integrate into existing applications while
 
 For now, you can use the library by referencing it directly from GitHub or by building it locally.
 
+## 🚫 Export Control Notice
+
+⚠️ **Export Control Notice**
+This software may be subject to UK and international export control laws. 
+It is not intended for use in countries embargoed or sanctioned by the UK, US, or EU. 
+By downloading or using this software, you agree that you are not located in, under the control of, or a national/resident of any such country.
+
 ## ✨ Features
 
 - 🔒 End-to-end encryption using modern cryptographic primitives
