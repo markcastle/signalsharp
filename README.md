@@ -23,7 +23,7 @@ SignalSharp is designed to be easy to integrate into existing applications while
 - 💾 Secure key storage and management
 - 📦 .NET Standard 2.1 compliant
 - 🔌 Flexible JSON serialization with pluggable providers
-- ✅ Comprehensive test coverage with 100+ unit tests
+- ✅ Comprehensive test coverage with 103 unit tests
 - 🔐 Message authentication with MAC verification
 - 🔑 Automatic key rotation and ratcheting
 - 🛡️ Protection against message skipping attacks
@@ -154,11 +154,12 @@ public class CustomKeyStore : IKeyStore
 - Immutable key pairs and session states
 - Secure key derivation using HMAC-based key derivation
 - Automatic key rotation and ratcheting
+- Note: System.Text.Json package has known high severity vulnerabilities (GHSA-8g4q-xg66-9fp4, GHSA-hh2w-p6rv-4g7w) - currently monitored for official fix
 
 ## 🧪 Testing
 
 The project maintains high test coverage with:
-- Unit tests for all core components
+- 103 unit tests covering all core components
 - Integration tests for key agreement and session management
 - Security tests for cryptographic operations
 - Mock-based testing for external dependencies
