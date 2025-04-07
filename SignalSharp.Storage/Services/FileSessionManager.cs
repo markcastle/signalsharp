@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using SignalSharp.Core.Interfaces;
 using SignalSharp.Core.Models;
+using SignalSharp.Core.Exceptions;
 
 namespace SignalSharp.Storage.Services
 {
@@ -41,41 +42,42 @@ namespace SignalSharp.Storage.Services
         }
 
         /// <inheritdoc/>
-        public async Task<string> CreateSessionAsync(byte[] remoteIdentityKey, byte[] remotePreKey, byte[] remotePreKeySignature)
+        public async Task CreateSessionAsync(string sessionId, byte[] remoteIdentityKey, byte[] remoteSignedPreKey, byte[] remoteOneTimePreKey)
         {
+            if (string.IsNullOrEmpty(sessionId))
+                throw new ArgumentNullException(nameof(sessionId));
             if (remoteIdentityKey == null)
                 throw new ArgumentNullException(nameof(remoteIdentityKey));
-            if (remotePreKey == null)
-                throw new ArgumentNullException(nameof(remotePreKey));
-            if (remotePreKeySignature == null)
-                throw new ArgumentNullException(nameof(remotePreKeySignature));
+            if (remoteSignedPreKey == null)
+                throw new ArgumentNullException(nameof(remoteSignedPreKey));
+            if (remoteOneTimePreKey == null)
+                throw new ArgumentNullException(nameof(remoteOneTimePreKey));
 
-            var sessionId = Guid.NewGuid().ToString();
-            var localIdentityKey = await _keyStore.GetKeyAsync("local_identity_key");
-            var rootKey = await _keyStore.GetKeyAsync("root_key");
-            var sendingChainKey = await _keyStore.GetKeyAsync("sending_chain_key");
-            var receivingChainKey = await _keyStore.GetKeyAsync("receiving_chain_key");
-            var sendingRatchetKey = await _keyStore.GetKeyAsync("sending_ratchet_key");
-            var receivingRatchetKey = await _keyStore.GetKeyAsync("receiving_ratchet_key");
+            var localIdentityKey = await _keyStore.GetAsync("local_identity_key");
+            var rootKey = await _keyStore.GetAsync("root_key");
+            var sendingChainKey = await _keyStore.GetAsync("sending_chain_key");
+            var receivingChainKey = await _keyStore.GetAsync("receiving_chain_key");
+            var sendingRatchetKey = await _keyStore.GetAsync("sending_ratchet_key");
+            var receivingRatchetKey = await _keyStore.GetAsync("receiving_ratchet_key");
 
-            if (localIdentityKey == null || rootKey == null || sendingChainKey == null ||
-                receivingChainKey == null || sendingRatchetKey == null || receivingRatchetKey == null)
+            if (string.IsNullOrEmpty(localIdentityKey) || string.IsNullOrEmpty(rootKey) || 
+                string.IsNullOrEmpty(sendingChainKey) || string.IsNullOrEmpty(receivingChainKey) || 
+                string.IsNullOrEmpty(sendingRatchetKey) || string.IsNullOrEmpty(receivingRatchetKey))
             {
                 throw new InvalidOperationException("Required keys not found");
             }
 
             var sessionState = new SessionState(
                 sessionId,
-                localIdentityKey,
+                Convert.FromBase64String(localIdentityKey),
                 remoteIdentityKey,
-                rootKey,
-                sendingChainKey,
-                receivingChainKey,
-                sendingRatchetKey,
-                receivingRatchetKey);
+                Convert.FromBase64String(rootKey),
+                Convert.FromBase64String(sendingChainKey),
+                Convert.FromBase64String(receivingChainKey),
+                Convert.FromBase64String(sendingRatchetKey),
+                Convert.FromBase64String(receivingRatchetKey));
 
             await SaveSessionStateAsync(sessionState);
-            return sessionId;
         }
 
         /// <inheritdoc/>
@@ -86,24 +88,11 @@ namespace SignalSharp.Storage.Services
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            var sessionState = await LoadSessionStateAsync(sessionId);
+            var sessionState = await GetSessionStateAsync(sessionId);
             if (sessionState == null)
-                throw new InvalidOperationException($"Session {sessionId} not found");
+                throw new SessionNotFoundException($"Session {sessionId} not found", sessionId);
 
-            var localIdentityKey = await _keyStore.GetKeyAsync("local_identity_key");
-            var rootKey = await _keyStore.GetKeyAsync("root_key");
-            var sendingChainKey = await _keyStore.GetKeyAsync("sending_chain_key");
-            var receivingChainKey = await _keyStore.GetKeyAsync("receiving_chain_key");
-            var sendingRatchetKey = await _keyStore.GetKeyAsync("sending_ratchet_key");
-            var receivingRatchetKey = await _keyStore.GetKeyAsync("receiving_ratchet_key");
-
-            if (localIdentityKey == null || rootKey == null || sendingChainKey == null ||
-                receivingChainKey == null || sendingRatchetKey == null || receivingRatchetKey == null)
-            {
-                throw new InvalidOperationException("Required keys not found");
-            }
-
-            var decryptedMessage = await _encryptionService.DecryptAsync(message, receivingChainKey);
+            var decryptedMessage = await _encryptionService.DecryptAsync(message, sessionState.ReceivingChainKey);
             sessionState.LastUsedAt = DateTime.UtcNow;
             await SaveSessionStateAsync(sessionState);
 
@@ -118,24 +107,11 @@ namespace SignalSharp.Storage.Services
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            var sessionState = await LoadSessionStateAsync(sessionId);
+            var sessionState = await GetSessionStateAsync(sessionId);
             if (sessionState == null)
-                throw new InvalidOperationException($"Session {sessionId} not found");
+                throw new SessionNotFoundException($"Session {sessionId} not found", sessionId);
 
-            var localIdentityKey = await _keyStore.GetKeyAsync("local_identity_key");
-            var rootKey = await _keyStore.GetKeyAsync("root_key");
-            var sendingChainKey = await _keyStore.GetKeyAsync("sending_chain_key");
-            var receivingChainKey = await _keyStore.GetKeyAsync("receiving_chain_key");
-            var sendingRatchetKey = await _keyStore.GetKeyAsync("sending_ratchet_key");
-            var receivingRatchetKey = await _keyStore.GetKeyAsync("receiving_ratchet_key");
-
-            if (localIdentityKey == null || rootKey == null || sendingChainKey == null ||
-                receivingChainKey == null || sendingRatchetKey == null || receivingRatchetKey == null)
-            {
-                throw new InvalidOperationException("Required keys not found");
-            }
-
-            var encryptedMessage = await _encryptionService.EncryptAsync(message, sendingChainKey);
+            var encryptedMessage = await _encryptionService.EncryptAsync(message, sessionState.SendingChainKey);
             sessionState.LastUsedAt = DateTime.UtcNow;
             await SaveSessionStateAsync(sessionState);
 
@@ -155,8 +131,12 @@ namespace SignalSharp.Storage.Services
             }
         }
 
-        private async Task<SessionState?> LoadSessionStateAsync(string sessionId)
+        /// <inheritdoc/>
+        public async Task<SessionState?> GetSessionStateAsync(string sessionId)
         {
+            if (string.IsNullOrEmpty(sessionId))
+                throw new ArgumentNullException(nameof(sessionId));
+
             var filePath = Path.Combine(_storageDirectory, $"{sessionId}.json");
             if (!File.Exists(filePath))
                 return null;
@@ -165,8 +145,12 @@ namespace SignalSharp.Storage.Services
             return _jsonSerializer.Deserialize<SessionState>(json);
         }
 
-        private async Task SaveSessionStateAsync(SessionState sessionState)
+        /// <inheritdoc/>
+        public async Task SaveSessionStateAsync(SessionState sessionState)
         {
+            if (sessionState == null)
+                throw new ArgumentNullException(nameof(sessionState));
+
             var filePath = Path.Combine(_storageDirectory, $"{sessionState.SessionId}.json");
             var json = _jsonSerializer.Serialize(sessionState);
             await File.WriteAllTextAsync(filePath, json);

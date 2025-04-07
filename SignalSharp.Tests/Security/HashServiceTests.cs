@@ -33,10 +33,11 @@ namespace SignalSharp.Tests.Security
         public async Task ComputeHashAsync_WithNullData_ShouldThrowArgumentNullException()
         {
             // Arrange
-            byte[] data = null;
+            byte[]? data = null;
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.ComputeHashAsync(data));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.ComputeHashAsync(data!));
         }
 
         [Fact]
@@ -58,22 +59,24 @@ namespace SignalSharp.Tests.Security
         public async Task ComputeKeyedHashAsync_WithNullData_ShouldThrowArgumentNullException()
         {
             // Arrange
-            byte[] data = null;
-            var key = Encoding.UTF8.GetBytes("SecretKey");
+            byte[]? data = null;
+            byte[] key = new byte[32];
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.ComputeKeyedHashAsync(data, key));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.ComputeKeyedHashAsync(data!, key));
         }
 
         [Fact]
         public async Task ComputeKeyedHashAsync_WithNullKey_ShouldThrowArgumentNullException()
         {
             // Arrange
-            var data = Encoding.UTF8.GetBytes("Hello, Signal!");
-            byte[] key = null;
+            byte[] data = new byte[32];
+            byte[]? key = null;
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.ComputeKeyedHashAsync(data, key));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.ComputeKeyedHashAsync(data, key!));
         }
 
         [Fact]
@@ -109,22 +112,24 @@ namespace SignalSharp.Tests.Security
         public async Task VerifyHashAsync_WithNullData_ShouldThrowArgumentNullException()
         {
             // Arrange
-            byte[] data = null;
-            var hash = new byte[32];
+            byte[]? data = null;
+            byte[] hash = new byte[32];
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.VerifyHashAsync(data, hash));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.VerifyHashAsync(data!, hash));
         }
 
         [Fact]
         public async Task VerifyHashAsync_WithNullHash_ShouldThrowArgumentNullException()
         {
             // Arrange
-            var data = Encoding.UTF8.GetBytes("Hello, Signal!");
-            byte[] hash = null;
+            byte[] data = new byte[32];
+            byte[]? hash = null;
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.VerifyHashAsync(data, hash));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.VerifyHashAsync(data, hash!));
         }
 
         [Fact]
@@ -162,36 +167,39 @@ namespace SignalSharp.Tests.Security
         public async Task VerifyKeyedHashAsync_WithNullData_ShouldThrowArgumentNullException()
         {
             // Arrange
-            byte[] data = null;
-            var key = Encoding.UTF8.GetBytes("SecretKey");
-            var hash = new byte[32];
+            byte[]? data = null;
+            byte[] key = new byte[32];
+            byte[] hash = new byte[32];
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.VerifyKeyedHashAsync(data, key, hash));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.VerifyKeyedHashAsync(data!, key, hash));
         }
 
         [Fact]
         public async Task VerifyKeyedHashAsync_WithNullKey_ShouldThrowArgumentNullException()
         {
             // Arrange
-            var data = Encoding.UTF8.GetBytes("Hello, Signal!");
-            byte[] key = null;
-            var hash = new byte[32];
+            byte[] data = new byte[32];
+            byte[]? key = null;
+            byte[] hash = new byte[32];
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.VerifyKeyedHashAsync(data, key, hash));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.VerifyKeyedHashAsync(data, key!, hash));
         }
 
         [Fact]
         public async Task VerifyKeyedHashAsync_WithNullHash_ShouldThrowArgumentNullException()
         {
             // Arrange
-            var data = Encoding.UTF8.GetBytes("Hello, Signal!");
-            var key = Encoding.UTF8.GetBytes("SecretKey");
-            byte[] hash = null;
+            byte[] data = new byte[32];
+            byte[] key = new byte[32];
+            byte[]? hash = null;
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentNullException>(() => _hashService.VerifyKeyedHashAsync(data, key, hash));
+            await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                await _hashService.VerifyKeyedHashAsync(data, key, hash!));
         }
     }
 } 

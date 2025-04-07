@@ -102,5 +102,21 @@ namespace SignalSharp.Security.Services
                 return aes.Key;
             });
         }
+
+        /// <summary>
+        /// Generates a new initialization vector (IV) for AES encryption.
+        /// </summary>
+        /// <returns>A new IV of appropriate length for AES encryption.</returns>
+        public async Task<byte[]> GenerateIvAsync()
+        {
+            return await Task.Run(() =>
+            {
+                using var aes = Aes.Create();
+                aes.KeySize = KeySize;
+                aes.BlockSize = BlockSize;
+                aes.GenerateIV();
+                return aes.IV;
+            });
+        }
     }
 } 

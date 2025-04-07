@@ -1,45 +1,46 @@
 using System.Threading.Tasks;
 using SignalSharp.Core.Models;
 
-namespace SignalSharp.Core.Interfaces;
-
-/// <summary>
-/// Defines the interface for the Extended Triple Diffie-Hellman (X3DH) key agreement protocol.
-/// </summary>
-public interface IX3DHKeyAgreementService
+namespace SignalSharp.Core.Interfaces
 {
     /// <summary>
-    /// Generates a new identity key pair for a user.
+    /// Interface for X3DH key agreement protocol operations.
     /// </summary>
-    /// <returns>A new identity key pair.</returns>
-    Task<KeyPair> GenerateIdentityKeyPairAsync();
+    public interface IX3DHKeyAgreementService
+    {
+        /// <summary>
+        /// Generates a new identity key pair.
+        /// </summary>
+        /// <returns>A new identity key pair.</returns>
+        Task<KeyPair> GenerateIdentityKeyPairAsync();
 
-    /// <summary>
-    /// Generates a new signed prekey pair for a user.
-    /// </summary>
-    /// <param name="identityKeyPair">The user's identity key pair.</param>
-    /// <returns>A new signed prekey pair.</returns>
-    Task<KeyPair> GenerateSignedPreKeyPairAsync(KeyPair identityKeyPair);
+        /// <summary>
+        /// Generates a new signed pre-key pair.
+        /// </summary>
+        /// <param name="identityKeyPair">The identity key pair to sign with.</param>
+        /// <returns>A new signed pre-key pair.</returns>
+        Task<KeyPair> GenerateSignedPreKeyPairAsync(KeyPair identityKeyPair);
 
-    /// <summary>
-    /// Generates a new one-time prekey pair.
-    /// </summary>
-    /// <returns>A new one-time prekey pair.</returns>
-    Task<KeyPair> GenerateOneTimePreKeyPairAsync();
+        /// <summary>
+        /// Generates a new one-time pre-key pair.
+        /// </summary>
+        /// <returns>A new one-time pre-key pair.</returns>
+        Task<KeyPair> GenerateOneTimePreKeyPairAsync();
 
-    /// <summary>
-    /// Performs the X3DH key agreement protocol to establish a shared secret between two parties.
-    /// </summary>
-    /// <param name="initiatorIdentityKey">The initiator's identity public key.</param>
-    /// <param name="initiatorEphemeralKey">The initiator's ephemeral public key.</param>
-    /// <param name="recipientIdentityKey">The recipient's identity public key.</param>
-    /// <param name="recipientSignedPreKey">The recipient's signed prekey public key.</param>
-    /// <param name="recipientOneTimePreKey">The recipient's one-time prekey public key (optional).</param>
-    /// <returns>The shared secret derived from the X3DH protocol.</returns>
-    Task<byte[]> PerformKeyAgreementAsync(
-        byte[] initiatorIdentityKey,
-        byte[] initiatorEphemeralKey,
-        byte[] recipientIdentityKey,
-        byte[] recipientSignedPreKey,
-        byte[]? recipientOneTimePreKey = null);
+        /// <summary>
+        /// Performs the X3DH key agreement protocol.
+        /// </summary>
+        /// <param name="remoteIdentityKey">The remote party's identity key.</param>
+        /// <param name="remoteSignedPreKey">The remote party's signed pre-key.</param>
+        /// <param name="remoteOneTimePreKey">The remote party's one-time pre-key.</param>
+        /// <param name="localIdentityKey">The local party's identity key.</param>
+        /// <param name="localSignedPreKey">The local party's signed pre-key.</param>
+        /// <returns>The shared secret.</returns>
+        Task<byte[]> PerformKeyAgreementAsync(
+            byte[] remoteIdentityKey,
+            byte[] remoteSignedPreKey,
+            byte[] remoteOneTimePreKey,
+            byte[] localIdentityKey,
+            byte[] localSignedPreKey);
+    }
 } 

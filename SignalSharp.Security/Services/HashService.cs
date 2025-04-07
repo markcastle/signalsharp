@@ -81,6 +81,60 @@ namespace SignalSharp.Security.Services
         }
 
         /// <summary>
+        /// Derives a key from the specified input using HKDF (HMAC-based Key Derivation Function).
+        /// </summary>
+        /// <param name="input">The input data to derive the key from.</param>
+        /// <param name="salt">The salt to use in the key derivation.</param>
+        /// <param name="outputLength">The desired length of the derived key in bytes.</param>
+        /// <returns>The derived key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when input or salt is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when outputLength is less than 1.</exception>
+        public async Task<byte[]> DeriveKeyAsync(byte[] input, byte[] salt, int outputLength)
+        {
+            if (input == null) throw new ArgumentNullException(nameof(input));
+            if (salt == null) throw new ArgumentNullException(nameof(salt));
+            if (outputLength < 1) throw new ArgumentException("Output length must be at least 1 byte", nameof(outputLength));
+
+            return await Task.Run(() =>
+            {
+                using var hmac = new HMACSHA256(salt);
+                var prk = hmac.ComputeHash(input);
+                var result = new byte[outputLength];
+                var block = new byte[0];
+                var offset = 0;
+
+                while (offset < outputLength)
+                {
+                    var blockSize = Math.Min(32, outputLength - offset);
+                    block = hmac.ComputeHash(block.Length == 0 ? prk : Concat(block, prk));
+                    Buffer.BlockCopy(block, 0, result, offset, blockSize);
+                    offset += blockSize;
+                }
+
+                return result;
+            });
+        }
+
+        /// <summary>
+        /// Computes a Message Authentication Code (MAC) for the specified data using HMACSHA256.
+        /// </summary>
+        /// <param name="data">The data to compute the MAC for.</param>
+        /// <param name="key">The key to use for the MAC computation.</param>
+        /// <returns>The computed MAC.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when data or key is null.</exception>
+        public async Task<byte[]> ComputeMacAsync(byte[] data, byte[] key)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (key == null) throw new ArgumentNullException(nameof(key));
+
+            return await Task.Run(() =>
+            {
+                using var hmac = new HMACSHA256(key);
+                return hmac.ComputeHash(data);
+            });
+        }
+
+        /// <summary>
         /// Compares two byte arrays for equality in a constant-time manner to prevent timing attacks.
         /// </summary>
         /// <param name="a">The first byte array.</param>
@@ -98,6 +152,20 @@ namespace SignalSharp.Security.Services
             }
 
             return result == 0;
+        }
+
+        /// <summary>
+        /// Concatenates two byte arrays.
+        /// </summary>
+        /// <param name="a">The first byte array.</param>
+        /// <param name="b">The second byte array.</param>
+        /// <returns>The concatenated byte array.</returns>
+        private static byte[] Concat(byte[] a, byte[] b)
+        {
+            var result = new byte[a.Length + b.Length];
+            Buffer.BlockCopy(a, 0, result, 0, a.Length);
+            Buffer.BlockCopy(b, 0, result, a.Length, b.Length);
+            return result;
         }
     }
 } 

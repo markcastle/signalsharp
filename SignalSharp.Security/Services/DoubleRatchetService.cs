@@ -18,7 +18,7 @@ namespace SignalSharp.Security.Services
     public class DoubleRatchetService : IDoubleRatchetService
     {
         private readonly IEncryptionService _encryptionService;
-        private readonly IKeyExchangeService _keyExchangeService;
+        private readonly IEcKeyExchangeService _keyExchangeService;
         private readonly IHashService _hashService;
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace SignalSharp.Security.Services
         /// <exception cref="ArgumentNullException">Thrown when any of the parameters are null.</exception>
         public DoubleRatchetService(
             IEncryptionService encryptionService,
-            IKeyExchangeService keyExchangeService,
+            IEcKeyExchangeService keyExchangeService,
             IHashService hashService)
         {
             _encryptionService = encryptionService ?? throw new ArgumentNullException(nameof(encryptionService));
@@ -149,7 +149,7 @@ namespace SignalSharp.Security.Services
             Buffer.BlockCopy(sharedSecret, 0, combined, rootKey.Length, sharedSecret.Length);
 
             // Derive chain key using HKDF
-            return await _hashService.DeriveKeyAsync(combined, purpose);
+            return await _hashService.DeriveKeyAsync(combined, System.Text.Encoding.UTF8.GetBytes(purpose), 32);
         }
 
         /// <summary>
@@ -170,10 +170,10 @@ namespace SignalSharp.Security.Services
             if (messageNumber < 0) throw new ArgumentOutOfRangeException(nameof(messageNumber), "Message number cannot be negative");
 
             // Derive message key
-            var messageKey = await _hashService.DeriveKeyAsync(chainKey, $"message_{messageNumber}");
+            var messageKey = await _hashService.DeriveKeyAsync(chainKey, System.Text.Encoding.UTF8.GetBytes($"message_{messageNumber}"), 32);
 
             // Derive new chain key
-            var newChainKey = await _hashService.DeriveKeyAsync(chainKey, "chain");
+            var newChainKey = await _hashService.DeriveKeyAsync(chainKey, System.Text.Encoding.UTF8.GetBytes("chain"), 32);
 
             return (newChainKey, messageKey);
         }
@@ -181,185 +181,187 @@ namespace SignalSharp.Security.Services
         /// <inheritdoc/>
         public async Task<SessionState> InitializeSessionAsync(byte[] rootKey, byte[] sendingRatchetKey, byte[] receivingRatchetKey)
         {
-            if (rootKey == null) throw new ArgumentNullException(nameof(rootKey));
-            if (sendingRatchetKey == null) throw new ArgumentNullException(nameof(sendingRatchetKey));
-            if (receivingRatchetKey == null) throw new ArgumentNullException(nameof(receivingRatchetKey));
+            if (rootKey == null || rootKey.Length == 0)
+                throw new ArgumentException("Root key cannot be empty", nameof(rootKey));
+            if (sendingRatchetKey == null || sendingRatchetKey.Length == 0)
+                throw new ArgumentException("Sending ratchet key cannot be empty", nameof(sendingRatchetKey));
+            if (receivingRatchetKey == null || receivingRatchetKey.Length == 0)
+                throw new ArgumentException("Receiving ratchet key cannot be empty", nameof(receivingRatchetKey));
 
-            // Generate initial chain keys
-            var sendingChainKey = await _keyExchangeService.DeriveSymmetricKeyAsync(rootKey, new byte[] { 0x01 });
-            var receivingChainKey = await _keyExchangeService.DeriveSymmetricKeyAsync(rootKey, new byte[] { 0x02 });
+            try
+            {
+                // Generate initial chain keys
+                var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(sendingRatchetKey, receivingRatchetKey);
+                if (sharedSecret == null || sharedSecret.Length == 0)
+                    throw new InvalidOperationException("Failed to compute shared secret");
 
-            return new SessionState(
-                Guid.NewGuid().ToString(),
-                sendingRatchetKey, // Local identity key is the sending ratchet key initially
-                receivingRatchetKey, // Remote identity key is the receiving ratchet key initially
-                rootKey,
-                sendingChainKey,
-                receivingChainKey,
-                sendingRatchetKey,
-                receivingRatchetKey);
+                var (sendingChainKey, receivingChainKey) = await InitializeRatchetAsync(rootKey, sharedSecret, true);
+                if (sendingChainKey == null || sendingChainKey.Length == 0)
+                    throw new InvalidOperationException("Failed to initialize sending chain key");
+                if (receivingChainKey == null || receivingChainKey.Length == 0)
+                    throw new InvalidOperationException("Failed to initialize receiving chain key");
+
+                // Create session state
+                return new SessionState(
+                    Guid.NewGuid().ToString(),
+                    sendingRatchetKey,
+                    receivingRatchetKey,
+                    rootKey,
+                    sendingChainKey,
+                    receivingChainKey,
+                    sendingRatchetKey,
+                    receivingRatchetKey);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException("Failed to initialize session", ex);
+            }
         }
 
         /// <inheritdoc/>
-        public async Task<(SignalMessage Message, SessionState UpdatedState)> EncryptMessageAsync(SessionState state, byte[] message)
+        public async Task<(SignalMessage Message, SessionState UpdatedState)> EncryptMessageAsync(SessionState sessionState, byte[] message)
         {
-            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (sessionState == null) throw new ArgumentNullException(nameof(sessionState));
             if (message == null) throw new ArgumentNullException(nameof(message));
 
-            // Check if we need to ratchet
-            if (state.SendingMessageNumber >= 100) // Arbitrary threshold for demonstration
-            {
-                state = await RatchetSendingAsync(state);
-            }
+            // Derive message key
+            var (newChainKey, messageKey) = await RatchetStepAsync(sessionState.SendingChainKey, (int)sessionState.SendingMessageNumber);
 
-            // Generate a random IV
-            var iv = new byte[16];
-            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(iv);
-            }
+            // Encrypt message
+            var encryptedMessage = await _encryptionService.EncryptAsync(message, messageKey);
 
-            // Encrypt the message
-            var encryptedContent = await _encryptionService.EncryptAsync(message, state.SendingChainKey);
-            var mac = await _hashService.ComputeKeyedHashAsync(encryptedContent, state.SendingChainKey);
-
-            // Create the signal message
-            var signalMessage = new SignalMessage(
-                encryptedContent,
-                mac,
-                iv,
-                state.LocalIdentityKey,
-                state.SendingRatchetKey)
+            // Create signal message
+            var signalMessage = new SignalMessage
             {
-                Counter = state.SendingMessageNumber,
-                PreviousCounter = state.PreviousSendingMessageNumber
+                Ciphertext = encryptedMessage,
+                MessageNumber = sessionState.SendingMessageNumber,
+                RatchetKey = sessionState.SendingRatchetKey
             };
 
-            // Create updated session state
+            // Update session state
             var updatedState = new SessionState(
-                state.SessionId,
-                state.LocalIdentityKey,
-                state.RemoteIdentityKey,
-                state.RootKey,
-                state.SendingChainKey,
-                state.ReceivingChainKey,
-                state.SendingRatchetKey,
-                state.ReceivingRatchetKey)
+                sessionState.SessionId,
+                sessionState.LocalIdentityKey,
+                sessionState.RemoteIdentityKey,
+                sessionState.RootKey,
+                newChainKey,
+                sessionState.ReceivingChainKey,
+                sessionState.SendingRatchetKey,
+                sessionState.ReceivingRatchetKey)
             {
-                SendingMessageNumber = state.SendingMessageNumber + 1,
-                ReceivingMessageNumber = state.ReceivingMessageNumber,
-                PreviousSendingMessageNumber = state.SendingMessageNumber,
-                PreviousReceivingMessageNumber = state.PreviousReceivingMessageNumber,
-                LastUsedAt = DateTime.UtcNow
+                SendingMessageNumber = sessionState.SendingMessageNumber + 1,
+                ReceivingMessageNumber = sessionState.ReceivingMessageNumber,
+                PreviousSendingMessageNumber = sessionState.PreviousSendingMessageNumber,
+                PreviousReceivingMessageNumber = sessionState.PreviousReceivingMessageNumber
             };
 
             return (signalMessage, updatedState);
         }
 
         /// <inheritdoc/>
-        public async Task<(byte[] DecryptedMessage, SessionState UpdatedState)> DecryptMessageAsync(SessionState state, SignalMessage message)
+        public async Task<(byte[] DecryptedMessage, SessionState UpdatedState)> DecryptMessageAsync(SessionState sessionState, SignalMessage message)
         {
-            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (sessionState == null) throw new ArgumentNullException(nameof(sessionState));
             if (message == null) throw new ArgumentNullException(nameof(message));
 
-            // Verify MAC
-            var isValid = await _hashService.VerifyKeyedHashAsync(message.Content, state.ReceivingChainKey, message.Mac);
-            if (!isValid)
-            {
-                throw new InvalidOperationException("Message authentication failed");
-            }
-
             // Check if we need to ratchet
-            if (message.SenderEphemeralKey != null && !message.SenderEphemeralKey.AsSpan().SequenceEqual(state.ReceivingRatchetKey))
+            if (message.RatchetKey != null && !message.RatchetKey.AsSpan().SequenceEqual(sessionState.ReceivingRatchetKey))
             {
-                state = await RatchetReceivingAsync(state, message.SenderEphemeralKey);
+                // Perform receiving ratchet
+                sessionState = await RatchetReceivingAsync(sessionState, message.RatchetKey);
             }
 
-            // Decrypt the message
-            var decryptedContent = await _encryptionService.DecryptAsync(message.Content, state.ReceivingChainKey);
+            // Derive message key
+            var (newChainKey, messageKey) = await RatchetStepAsync(sessionState.ReceivingChainKey, (int)message.MessageNumber);
 
-            // Create updated session state
-            var updatedState = new SessionState(
-                state.SessionId,
-                state.LocalIdentityKey,
-                state.RemoteIdentityKey,
-                state.RootKey,
-                state.SendingChainKey,
-                state.ReceivingChainKey,
-                state.SendingRatchetKey,
-                state.ReceivingRatchetKey)
+            // Verify hash
+            if (message.Mac != null && !await _hashService.VerifyKeyedHashAsync(message.Ciphertext, messageKey, message.Mac))
             {
-                SendingMessageNumber = state.SendingMessageNumber,
-                ReceivingMessageNumber = message.Counter,
-                PreviousSendingMessageNumber = state.PreviousSendingMessageNumber,
-                PreviousReceivingMessageNumber = message.PreviousCounter,
-                LastUsedAt = DateTime.UtcNow
+                throw new InvalidOperationException("Message hash verification failed.");
+            }
+
+            // Decrypt message
+            var decryptedMessage = await _encryptionService.DecryptAsync(message.Ciphertext, messageKey);
+
+            // Update session state
+            var updatedState = new SessionState(
+                sessionState.SessionId,
+                sessionState.LocalIdentityKey,
+                sessionState.RemoteIdentityKey,
+                sessionState.RootKey,
+                sessionState.SendingChainKey,
+                newChainKey,
+                sessionState.SendingRatchetKey,
+                sessionState.ReceivingRatchetKey)
+            {
+                SendingMessageNumber = sessionState.SendingMessageNumber,
+                ReceivingMessageNumber = message.MessageNumber + 1,
+                PreviousSendingMessageNumber = sessionState.PreviousSendingMessageNumber,
+                PreviousReceivingMessageNumber = sessionState.PreviousReceivingMessageNumber
             };
 
-            return (decryptedContent, updatedState);
+            return (decryptedMessage, updatedState);
         }
 
         /// <inheritdoc/>
-        public async Task<SessionState> RatchetSendingAsync(SessionState state)
+        public async Task<SessionState> RatchetSendingAsync(SessionState sessionState)
         {
-            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (sessionState == null) throw new ArgumentNullException(nameof(sessionState));
 
             // Generate new ratchet key pair
             var (newRatchetPublicKey, newRatchetPrivateKey) = await _keyExchangeService.GenerateKeyPairAsync();
 
-            // Compute new shared secret
-            var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(newRatchetPrivateKey, state.ReceivingRatchetKey);
+            // Compute shared secret
+            var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(newRatchetPrivateKey, sessionState.ReceivingRatchetKey);
 
-            // Derive new chain keys
-            var (newSendingChainKey, _) = await DeriveChainKeysAsync(sharedSecret);
+            // Derive new chain key
+            var newChainKey = await _keyExchangeService.DeriveSymmetricKeyAsync(sharedSecret, newRatchetPublicKey);
 
-            // Create new session state with updated keys
+            // Update session state
             return new SessionState(
-                state.SessionId,
-                state.LocalIdentityKey,
-                state.RemoteIdentityKey,
-                state.RootKey,
-                newSendingChainKey,
-                state.ReceivingChainKey,
+                sessionState.SessionId,
+                sessionState.LocalIdentityKey,
+                sessionState.RemoteIdentityKey,
+                sessionState.RootKey,
+                newChainKey,
+                sessionState.ReceivingChainKey,
                 newRatchetPublicKey,
-                state.ReceivingRatchetKey)
+                sessionState.ReceivingRatchetKey)
             {
                 SendingMessageNumber = 0,
-                ReceivingMessageNumber = state.ReceivingMessageNumber,
-                PreviousSendingMessageNumber = state.SendingMessageNumber,
-                PreviousReceivingMessageNumber = state.PreviousReceivingMessageNumber,
-                LastUsedAt = DateTime.UtcNow
+                ReceivingMessageNumber = sessionState.ReceivingMessageNumber,
+                PreviousSendingMessageNumber = sessionState.SendingMessageNumber,
+                PreviousReceivingMessageNumber = sessionState.PreviousReceivingMessageNumber
             };
         }
 
         /// <inheritdoc/>
-        public async Task<SessionState> RatchetReceivingAsync(SessionState state, byte[] newRatchetKey)
+        public async Task<SessionState> RatchetReceivingAsync(SessionState sessionState, byte[] newRatchetKey)
         {
-            if (state == null) throw new ArgumentNullException(nameof(state));
+            if (sessionState == null) throw new ArgumentNullException(nameof(sessionState));
             if (newRatchetKey == null) throw new ArgumentNullException(nameof(newRatchetKey));
 
-            // Compute new shared secret
-            var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(state.SendingRatchetKey, newRatchetKey);
+            // Compute shared secret
+            var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(sessionState.SendingRatchetKey, newRatchetKey);
 
-            // Derive new chain keys
-            var (_, newReceivingChainKey) = await DeriveChainKeysAsync(sharedSecret);
+            // Derive new chain key
+            var newChainKey = await _keyExchangeService.DeriveSymmetricKeyAsync(sharedSecret, newRatchetKey);
 
-            // Create new session state with updated keys
+            // Update session state
             return new SessionState(
-                state.SessionId,
-                state.LocalIdentityKey,
-                state.RemoteIdentityKey,
-                state.RootKey,
-                state.SendingChainKey,
-                newReceivingChainKey,
-                state.SendingRatchetKey,
+                sessionState.SessionId,
+                sessionState.LocalIdentityKey,
+                sessionState.RemoteIdentityKey,
+                sessionState.RootKey,
+                sessionState.SendingChainKey,
+                newChainKey,
+                sessionState.SendingRatchetKey,
                 newRatchetKey)
             {
-                SendingMessageNumber = state.SendingMessageNumber,
+                SendingMessageNumber = sessionState.SendingMessageNumber,
                 ReceivingMessageNumber = 0,
-                PreviousSendingMessageNumber = state.PreviousSendingMessageNumber,
-                PreviousReceivingMessageNumber = state.ReceivingMessageNumber,
-                LastUsedAt = DateTime.UtcNow
+                PreviousSendingMessageNumber = sessionState.PreviousSendingMessageNumber,
+                PreviousReceivingMessageNumber = sessionState.ReceivingMessageNumber
             };
         }
     }

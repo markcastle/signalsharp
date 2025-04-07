@@ -5,6 +5,8 @@ using Xunit;
 using Moq;
 using SignalSharp.Core.Interfaces;
 using SignalSharp.Core.Models;
+using SignalSharp.Core.Services;
+using SignalSharp.Security.Services;
 using SignalSharp.Storage.Services;
 
 namespace SignalSharp.Tests.Storage
@@ -19,6 +21,7 @@ namespace SignalSharp.Tests.Storage
         public FileKeyStoreTests()
         {
             _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(_testDirectory);
             _mockJsonSerializer = new Mock<IJsonSerializer>();
             _mockEncryptionService = new Mock<IEncryptionService>();
             _keyStore = new FileKeyStore(_testDirectory, _mockJsonSerializer.Object, _mockEncryptionService.Object);
@@ -81,6 +84,9 @@ namespace SignalSharp.Tests.Storage
         {
             // Arrange
             var keyId = "non_existent_key";
+            var filePath = Path.Combine(_testDirectory, $"v1_{keyId}.key");
+            if (File.Exists(filePath))
+                File.Delete(filePath);
 
             // Act
             var result = await _keyStore.GetKeyAsync(keyId);
@@ -174,6 +180,11 @@ namespace SignalSharp.Tests.Storage
         [Fact]
         public async Task GetIdentityKeyAsync_WithNoKey_ShouldReturnNull()
         {
+            // Arrange
+            var filePath = Path.Combine(_testDirectory, "v1_identity.key");
+            if (File.Exists(filePath))
+                File.Delete(filePath);
+
             // Act
             var result = await _keyStore.GetIdentityKeyAsync();
 
@@ -185,21 +196,25 @@ namespace SignalSharp.Tests.Storage
         public async Task GenerateEphemeralKeyPairAsync_ShouldGenerateAndStoreKey()
         {
             // Arrange
-            var generatedKey = new byte[] { 1, 2, 3, 4 };
-            _mockEncryptionService.Setup(x => x.GenerateKeyAsync())
-                .ReturnsAsync(generatedKey);
-            _mockEncryptionService.Setup(x => x.EncryptAsync(generatedKey, It.IsAny<byte[]>()))
-                .ReturnsAsync(generatedKey);
-            _mockEncryptionService.Setup(x => x.DecryptAsync(generatedKey, It.IsAny<byte[]>()))
-                .ReturnsAsync(generatedKey);
+            var publicKey = new byte[] { 1, 2, 3, 4 };
+            var privateKey = new byte[] { 5, 6, 7, 8 };
+            var expectedKeyPair = new KeyPair(publicKey, privateKey);
+            _mockEncryptionService.SetupSequence(x => x.GenerateKeyAsync())
+                .ReturnsAsync(publicKey)
+                .ReturnsAsync(privateKey);
+            _mockEncryptionService.Setup(x => x.EncryptAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync((byte[] data, byte[] key) => data);
+            _mockEncryptionService.Setup(x => x.DecryptAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync((byte[] data, byte[] key) => data);
 
             // Act
             var result = await _keyStore.GenerateEphemeralKeyPairAsync();
 
             // Assert
             Assert.NotNull(result);
-            Assert.Equal(generatedKey, result);
-            _mockEncryptionService.Verify(x => x.GenerateKeyAsync(), Times.Once);
+            Assert.Equal(expectedKeyPair.PublicKey, result.PublicKey);
+            Assert.Equal(expectedKeyPair.PrivateKey, result.PrivateKey);
+            _mockEncryptionService.Verify(x => x.GenerateKeyAsync(), Times.Exactly(2));
         }
 
         [Fact]

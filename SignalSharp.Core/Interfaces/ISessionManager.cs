@@ -1,47 +1,59 @@
 using System;
 using System.Threading.Tasks;
+using SignalSharp.Core.Models;
 
 namespace SignalSharp.Core.Interfaces
 {
     /// <summary>
-    /// Provides methods for managing Signal protocol sessions.
+    /// Interface for managing Signal protocol sessions.
     /// </summary>
     public interface ISessionManager
     {
         /// <summary>
         /// Creates a new session with a remote party.
         /// </summary>
+        /// <param name="sessionId">The unique identifier for the session.</param>
         /// <param name="remoteIdentityKey">The remote party's identity key.</param>
-        /// <param name="remotePreKey">The remote party's pre-key.</param>
-        /// <param name="remotePreKeySignature">The signature of the remote party's pre-key.</param>
-        /// <returns>The session ID for the newly created session.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when any parameter is null.</exception>
-        Task<string> CreateSessionAsync(byte[] remoteIdentityKey, byte[] remotePreKey, byte[] remotePreKeySignature);
+        /// <param name="remoteSignedPreKey">The remote party's signed pre-key.</param>
+        /// <param name="remoteOneTimePreKey">The remote party's one-time pre-key.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        Task CreateSessionAsync(string sessionId, byte[] remoteIdentityKey, byte[] remoteSignedPreKey, byte[] remoteOneTimePreKey);
 
         /// <summary>
         /// Processes an incoming message and returns the decrypted content.
         /// </summary>
-        /// <param name="sessionId">The ID of the session to use.</param>
-        /// <param name="message">The encrypted message to process.</param>
-        /// <returns>The decrypted message content.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when sessionId or message is null.</exception>
-        Task<byte[]> ProcessIncomingMessageAsync(string sessionId, byte[] message);
+        /// <param name="sessionId">The session ID.</param>
+        /// <param name="encryptedMessage">The encrypted message.</param>
+        /// <returns>The decrypted message.</returns>
+        Task<byte[]> ProcessIncomingMessageAsync(string sessionId, byte[] encryptedMessage);
 
         /// <summary>
         /// Encrypts a message for a specific session.
         /// </summary>
-        /// <param name="sessionId">The ID of the session to use.</param>
+        /// <param name="sessionId">The session ID.</param>
         /// <param name="message">The message to encrypt.</param>
         /// <returns>The encrypted message.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when sessionId or message is null.</exception>
         Task<byte[]> EncryptMessageAsync(string sessionId, byte[] message);
 
         /// <summary>
         /// Deletes a session and its associated keys.
         /// </summary>
-        /// <param name="sessionId">The ID of the session to delete.</param>
+        /// <param name="sessionId">The session ID.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when sessionId is null.</exception>
         Task DeleteSessionAsync(string sessionId);
+
+        /// <summary>
+        /// Gets the session state for a specific session.
+        /// </summary>
+        /// <param name="sessionId">The session ID.</param>
+        /// <returns>The session state, or null if the session does not exist.</returns>
+        Task<SessionState?> GetSessionStateAsync(string sessionId);
+
+        /// <summary>
+        /// Saves the session state for a specific session.
+        /// </summary>
+        /// <param name="sessionState">The session state to save.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        Task SaveSessionStateAsync(SessionState sessionState);
     }
 } 

@@ -56,6 +56,16 @@
   - [ ] Document best practices and patterns
   - [ ] Create integration guides for common scenarios
 
+- [x] Create dependency injection project
+  - [x] Create SignalSharp.DependencyInjection project
+  - [x] Implement extension methods for IServiceCollection
+  - [x] Add configuration options for services
+  - [x] Create factory methods for common scenarios
+  - [x] Add support for different storage backends
+  - [x] Add support for different JSON serializers
+  - [x] Add unit tests for dependency injection
+  - [x] Document dependency injection usage
+
 ### Lower Priority
 - [ ] Improve error handling and debugging
   - [ ] Enhance error messages with more context
@@ -133,14 +143,51 @@
   - [x] Implement SessionManager for managing Signal protocol sessions
   - [x] Add support for session creation, message processing, and session deletion
   - [x] Add comprehensive unit tests for session management
+- [x] Create dependency injection project (2024-04-07)
+  - [x] Create SignalSharp.DependencyInjection project
+  - [x] Implement extension methods for IServiceCollection
+  - [x] Add configuration options for services
+  - [x] Create factory methods for common scenarios
+  - [x] Add support for different storage backends
+  - [x] Add support for different JSON serializers
+  - [x] Add unit tests for dependency injection
+  - [x] Document dependency injection usage
 
 ## Discovered During Work
-- [x] Need for secure key generation and storage
-- [x] Need for proper session state management
-- [x] Need for better error handling in key operations
-- [ ] Need for performance optimization in key operations
-- [ ] Need for better logging and monitoring
-- [ ] Need for better error messages and debugging
+
+### Security
+- Need for secure key generation and storage
+- Need for proper session state management
+- Need for better error handling in key operations
+- Need for logging and monitoring
+- Need for performance optimization
+
+### Documentation
+- Need for comprehensive API documentation
+- Need for detailed examples
+- Need for troubleshooting guide
+- Need for security considerations
+- Need for best practices
+- Need for code samples
+
+### Testing
+- Need for more unit tests
+- Need for integration tests
+- Need for performance tests
+- Need for security tests
+
+### Performance
+- Need for performance optimization
+- Need for better error handling
+- Need for logging and monitoring
+- Need for batch operations
+
+### Integration
+- Need for dependency injection support
+- Need for configuration options
+- Need for factory methods
+- Need for different storage backends
+- Need for different JSON serializers
 
 ## Future Tasks
 - [ ] Add documentation and examples

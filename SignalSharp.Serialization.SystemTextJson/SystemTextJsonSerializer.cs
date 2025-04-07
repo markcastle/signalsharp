@@ -26,7 +26,7 @@ namespace SignalSharp.Serialization.SystemTextJson
         }
 
         /// <inheritdoc/>
-        public string Serialize<T>(T value)
+        public string Serialize<T>(T value) where T : class
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
@@ -35,7 +35,7 @@ namespace SignalSharp.Serialization.SystemTextJson
         }
 
         /// <inheritdoc/>
-        public Task<string> SerializeAsync<T>(T value)
+        public Task<string> SerializeAsync<T>(T value) where T : class
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
@@ -44,21 +44,29 @@ namespace SignalSharp.Serialization.SystemTextJson
         }
 
         /// <inheritdoc/>
-        public T? Deserialize<T>(string json)
+        public T Deserialize<T>(string json) where T : class
         {
             if (string.IsNullOrEmpty(json))
                 throw new ArgumentNullException(nameof(json));
 
-            return JsonSerializer.Deserialize<T>(json, _options);
+            var result = JsonSerializer.Deserialize<T>(json, _options);
+            if (result == null)
+                throw new InvalidOperationException($"Failed to deserialize JSON to type {typeof(T).Name}");
+
+            return result;
         }
 
         /// <inheritdoc/>
-        public Task<T?> DeserializeAsync<T>(string json)
+        public Task<T> DeserializeAsync<T>(string json) where T : class
         {
             if (string.IsNullOrEmpty(json))
                 throw new ArgumentNullException(nameof(json));
 
-            return Task.FromResult(JsonSerializer.Deserialize<T>(json, _options));
+            var result = JsonSerializer.Deserialize<T>(json, _options);
+            if (result == null)
+                throw new InvalidOperationException($"Failed to deserialize JSON to type {typeof(T).Name}");
+
+            return Task.FromResult(result);
         }
     }
 } 

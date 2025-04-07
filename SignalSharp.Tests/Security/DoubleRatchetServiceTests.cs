@@ -12,14 +12,14 @@ namespace SignalSharp.Tests.Security
 {
     public class DoubleRatchetServiceTests
     {
-        private readonly Mock<IKeyExchangeService> _keyExchangeServiceMock;
+        private readonly Mock<IEcKeyExchangeService> _keyExchangeServiceMock;
         private readonly Mock<IEncryptionService> _encryptionServiceMock;
         private readonly Mock<IHashService> _hashServiceMock;
         private readonly IDoubleRatchetService _doubleRatchetService;
 
         public DoubleRatchetServiceTests()
         {
-            _keyExchangeServiceMock = new Mock<IKeyExchangeService>();
+            _keyExchangeServiceMock = new Mock<IEcKeyExchangeService>();
             _encryptionServiceMock = new Mock<IEncryptionService>();
             _hashServiceMock = new Mock<IHashService>();
             _doubleRatchetService = new DoubleRatchetService(
@@ -35,15 +35,30 @@ namespace SignalSharp.Tests.Security
             var rootKey = new byte[] { 1, 2, 3 };
             var sendingRatchetKey = new byte[] { 4, 5, 6 };
             var receivingRatchetKey = new byte[] { 7, 8, 9 };
-            var sendingChainKey = new byte[] { 10, 11, 12 };
-            var receivingChainKey = new byte[] { 13, 14, 15 };
+            var sharedSecret = new byte[] { 10, 11, 12 };
+            var sendingChainKey = new byte[] { 13, 14, 15 };
+            var receivingChainKey = new byte[] { 16, 17, 18 };
 
             _keyExchangeServiceMock
-                .Setup(x => x.DeriveSymmetricKeyAsync(It.Is<byte[]>(x => x.SequenceEqual(rootKey)), It.Is<byte[]>(x => x.SequenceEqual(new byte[] { 0x01 }))))
+                .Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(sharedSecret);
+
+            _keyExchangeServiceMock
+                .Setup(x => x.GenerateKeyPairAsync())
+                .ReturnsAsync((sendingRatchetKey, sendingRatchetKey));
+
+            _hashServiceMock
+                .Setup(x => x.DeriveKeyAsync(
+                    It.Is<byte[]>(k => k.SequenceEqual(rootKey.Concat(sharedSecret).ToArray())),
+                    It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "sending"),
+                    32))
                 .ReturnsAsync(sendingChainKey);
 
-            _keyExchangeServiceMock
-                .Setup(x => x.DeriveSymmetricKeyAsync(It.Is<byte[]>(x => x.SequenceEqual(rootKey)), It.Is<byte[]>(x => x.SequenceEqual(new byte[] { 0x02 }))))
+            _hashServiceMock
+                .Setup(x => x.DeriveKeyAsync(
+                    It.Is<byte[]>(k => k.SequenceEqual(rootKey.Concat(sharedSecret).ToArray())),
+                    It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "receiving"),
+                    32))
                 .ReturnsAsync(receivingChainKey);
 
             // Act
@@ -62,119 +77,210 @@ namespace SignalSharp.Tests.Security
         public async Task EncryptMessageAsync_ShouldEncryptMessageAndComputeHash()
         {
             // Arrange
+            var sessionId = "test-session";
+            var localIdentityKey = new byte[] { 1, 2, 3 };
+            var remoteIdentityKey = new byte[] { 4, 5, 6 };
+            var rootKey = new byte[] { 7, 8, 9 };
+            var sendingChainKey = new byte[] { 10, 11, 12 };
+            var receivingChainKey = new byte[] { 13, 14, 15 };
+            var sendingRatchetKey = new byte[] { 16, 17, 18 };
+            var receivingRatchetKey = new byte[] { 19, 20, 21 };
+            var message = new byte[] { 22, 23, 24 };
+            var ciphertext = new byte[] { 25, 26, 27 };
+            var mac = new byte[] { 28, 29, 30 };
+            var sharedSecret = new byte[] { 31, 32, 33 };
+
             var sessionState = new SessionState(
-                Guid.NewGuid().ToString(),
-                new byte[] { 1, 2, 3 }, // Local identity key
-                new byte[] { 4, 5, 6 }, // Remote identity key
-                new byte[] { 7, 8, 9 }, // Root key
-                new byte[] { 10, 11, 12 }, // Sending chain key
-                new byte[] { 13, 14, 15 }, // Receiving chain key
-                new byte[] { 16, 17, 18 }, // Sending ratchet key
-                new byte[] { 19, 20, 21 }); // Receiving ratchet key
+                sessionId,
+                localIdentityKey,
+                remoteIdentityKey,
+                rootKey,
+                sendingChainKey,
+                receivingChainKey,
+                sendingRatchetKey,
+                receivingRatchetKey);
 
-            var message = new byte[] { 1, 2, 3 };
-            var encryptedContent = new byte[] { 4, 5, 6 };
-            var mac = new byte[] { 7, 8, 9 };
+            _keyExchangeServiceMock
+                .Setup(x => x.ComputeSharedSecretAsync(sendingRatchetKey, receivingRatchetKey))
+                .ReturnsAsync(sharedSecret);
 
-            _encryptionServiceMock
-                .Setup(x => x.EncryptAsync(
-                    It.Is<byte[]>(x => x == message),
-                    It.Is<byte[]>(x => x == sessionState.SendingChainKey)))
-                .ReturnsAsync(encryptedContent);
+            var newChainKey = new byte[] { 34, 35, 36 };
+            var messageKey = new byte[] { 37, 38, 39 };
 
             _hashServiceMock
-                .Setup(x => x.ComputeKeyedHashAsync(
-                    It.Is<byte[]>(x => x == encryptedContent),
-                    It.Is<byte[]>(x => x == sessionState.SendingChainKey)))
+                .Setup(x => x.DeriveKeyAsync(
+                    sendingChainKey,
+                    It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "message_0"),
+                    32))
+                .ReturnsAsync(messageKey);
+
+            _hashServiceMock
+                .Setup(x => x.DeriveKeyAsync(
+                    sendingChainKey,
+                    It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "chain"),
+                    32))
+                .ReturnsAsync(newChainKey);
+
+            _encryptionServiceMock
+                .Setup(x => x.EncryptAsync(message, messageKey))
+                .ReturnsAsync(ciphertext);
+
+            _hashServiceMock
+                .Setup(x => x.ComputeKeyedHashAsync(ciphertext, sendingChainKey))
                 .ReturnsAsync(mac);
 
+            var signalMessage = new SignalMessage
+            {
+                Ciphertext = ciphertext,
+                MessageNumber = 0,
+                RatchetKey = sendingRatchetKey
+            };
+
             // Act
-            var (signalMessage, updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
+            var (result, updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
 
             // Assert
-            Assert.NotNull(signalMessage);
-            Assert.Equal(encryptedContent, signalMessage.Content);
-            Assert.Equal(mac, signalMessage.Mac);
-            Assert.Equal(sessionState.LocalIdentityKey, signalMessage.SenderIdentityKey);
-            Assert.Equal(sessionState.SendingRatchetKey, signalMessage.SenderEphemeralKey);
-            Assert.Equal(sessionState.SendingMessageNumber + 1, updatedState.SendingMessageNumber);
+            Assert.NotNull(result);
+            Assert.Equal(ciphertext, result.Ciphertext);
+            Assert.Equal((uint)0, result.MessageNumber);
+            Assert.Equal(sendingRatchetKey, result.RatchetKey);
+            Assert.Equal(newChainKey, updatedState.SendingChainKey);
+            Assert.Equal(receivingChainKey, updatedState.ReceivingChainKey);
         }
 
         [Fact]
         public async Task DecryptMessageAsync_ShouldVerifyHashAndDecryptMessage()
         {
             // Arrange
+            var sessionId = "test-session";
+            var localIdentityKey = new byte[] { 1, 2, 3 };
+            var remoteIdentityKey = new byte[] { 4, 5, 6 };
+            var rootKey = new byte[] { 7, 8, 9 };
+            var sendingChainKey = new byte[] { 10, 11, 12 };
+            var receivingChainKey = new byte[] { 13, 14, 15 };
+            var sendingRatchetKey = new byte[] { 16, 17, 18 };
+            var receivingRatchetKey = new byte[] { 19, 20, 21 };
+            var ciphertext = new byte[] { 22, 23, 24 };
+            var mac = new byte[] { 25, 26, 27 };
+            var messageKey = new byte[] { 37, 38, 39 };
+            var newChainKey = new byte[] { 34, 35, 36 };
+            var plaintext = new byte[] { 40, 41, 42 };
+
             var sessionState = new SessionState(
-                Guid.NewGuid().ToString(),
-                new byte[] { 1, 2, 3 }, // Local identity key
-                new byte[] { 4, 5, 6 }, // Remote identity key
-                new byte[] { 7, 8, 9 }, // Root key
-                new byte[] { 10, 11, 12 }, // Sending chain key
-                new byte[] { 13, 14, 15 }, // Receiving chain key
-                new byte[] { 16, 17, 18 }, // Sending ratchet key
-                new byte[] { 19, 20, 21 }); // Receiving ratchet key
+                sessionId,
+                localIdentityKey,
+                remoteIdentityKey,
+                rootKey,
+                sendingChainKey,
+                receivingChainKey,
+                sendingRatchetKey,
+                receivingRatchetKey);
 
-            var signalMessage = new SignalMessage(
-                new byte[] { 1, 2, 3 }, // Content
-                new byte[] { 4, 5, 6 }, // MAC
-                new byte[] { 7, 8, 9 }, // IV
-                sessionState.RemoteIdentityKey,
-                sessionState.ReceivingRatchetKey)
-            {
-                Counter = 1,
-                PreviousCounter = 0
-            };
-
-            var decryptedContent = new byte[] { 10, 11, 12 };
+            _keyExchangeServiceMock
+                .Setup(x => x.ComputeSharedSecretAsync(sendingRatchetKey, receivingRatchetKey))
+                .ReturnsAsync(new byte[] { 31, 32, 33 });
 
             _hashServiceMock
-                .Setup(x => x.VerifyKeyedHashAsync(
-                    It.Is<byte[]>(x => x == signalMessage.Content),
-                    It.Is<byte[]>(x => x == sessionState.ReceivingChainKey),
-                    It.Is<byte[]>(x => x == signalMessage.Mac)))
+                .Setup(x => x.DeriveKeyAsync(
+                    receivingChainKey,
+                    It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "message_0"),
+                    32))
+                .ReturnsAsync(messageKey);
+
+            _hashServiceMock
+                .Setup(x => x.DeriveKeyAsync(
+                    receivingChainKey,
+                    It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "chain"),
+                    32))
+                .ReturnsAsync(newChainKey);
+
+            _hashServiceMock
+                .Setup(x => x.VerifyKeyedHashAsync(ciphertext, messageKey, mac))
                 .ReturnsAsync(true);
 
             _encryptionServiceMock
-                .Setup(x => x.DecryptAsync(
-                    It.Is<byte[]>(x => x == signalMessage.Content),
-                    It.Is<byte[]>(x => x == sessionState.ReceivingChainKey)))
-                .ReturnsAsync(decryptedContent);
+                .Setup(x => x.DecryptAsync(ciphertext, messageKey))
+                .ReturnsAsync(plaintext);
+
+            var signalMessage = new SignalMessage
+            {
+                Ciphertext = ciphertext,
+                Mac = mac,
+                MessageNumber = 0,
+                RatchetKey = receivingRatchetKey
+            };
 
             // Act
-            var (result, updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
+            var (decryptedMessage, updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
 
             // Assert
-            Assert.Equal(decryptedContent, result);
-            Assert.Equal(signalMessage.Counter, updatedState.ReceivingMessageNumber);
+            Assert.NotNull(decryptedMessage);
+            Assert.Equal(plaintext, decryptedMessage);
+            Assert.Equal(newChainKey, updatedState.ReceivingChainKey);
+            Assert.Equal(sendingChainKey, updatedState.SendingChainKey);
         }
 
         [Fact]
         public async Task DecryptMessageAsync_ShouldThrowIfHashVerificationFails()
         {
             // Arrange
-            var sessionState = new SessionState(
-                Guid.NewGuid().ToString(),
-                new byte[] { 1, 2, 3 }, // Local identity key
-                new byte[] { 4, 5, 6 }, // Remote identity key
-                new byte[] { 7, 8, 9 }, // Root key
-                new byte[] { 10, 11, 12 }, // Sending chain key
-                new byte[] { 13, 14, 15 }, // Receiving chain key
-                new byte[] { 16, 17, 18 }, // Sending ratchet key
-                new byte[] { 19, 20, 21 }); // Receiving ratchet key
+            var sessionId = "test-session";
+            var localIdentityKey = new byte[32];
+            var remoteIdentityKey = new byte[32];
+            var rootKey = new byte[32];
+            var sendingChainKey = new byte[32];
+            var receivingChainKey = new byte[32];
+            var sendingRatchetKey = new byte[32];
+            var receivingRatchetKey = new byte[32];
+            var ciphertext = new byte[32];
+            var mac = new byte[32];
+            var sharedSecret = new byte[32];
+            var newChainKey = new byte[32];
 
-            var signalMessage = new SignalMessage(
-                new byte[] { 1, 2, 3 },
-                new byte[] { 4, 5, 6 },
-                new byte[] { 7, 8, 9 },
-                sessionState.RemoteIdentityKey,
-                sessionState.ReceivingRatchetKey);
+            // Initialize the arrays with non-zero values
+            new Random().NextBytes(localIdentityKey);
+            new Random().NextBytes(remoteIdentityKey);
+            new Random().NextBytes(rootKey);
+            new Random().NextBytes(sendingChainKey);
+            new Random().NextBytes(receivingChainKey);
+            new Random().NextBytes(sendingRatchetKey);
+            new Random().NextBytes(receivingRatchetKey);
+            new Random().NextBytes(ciphertext);
+            new Random().NextBytes(mac);
+            new Random().NextBytes(sharedSecret);
+            new Random().NextBytes(newChainKey);
+
+            var sessionState = new SessionState(
+                sessionId,
+                localIdentityKey,
+                remoteIdentityKey,
+                rootKey,
+                sendingChainKey,
+                receivingChainKey,
+                sendingRatchetKey,
+                receivingRatchetKey);
+
+            _keyExchangeServiceMock
+                .Setup(x => x.ComputeSharedSecretAsync(sendingRatchetKey, receivingRatchetKey))
+                .ReturnsAsync(sharedSecret);
+
+            _keyExchangeServiceMock
+                .Setup(x => x.DeriveSymmetricKeyAsync(sharedSecret, receivingRatchetKey))
+                .ReturnsAsync(newChainKey);
 
             _hashServiceMock
-                .Setup(x => x.VerifyKeyedHashAsync(
-                    It.Is<byte[]>(x => x == signalMessage.Content),
-                    It.Is<byte[]>(x => x == sessionState.ReceivingChainKey),
-                    It.Is<byte[]>(x => x == signalMessage.Mac)))
+                .Setup(x => x.VerifyKeyedHashAsync(ciphertext, newChainKey, mac))
                 .ReturnsAsync(false);
+
+            var signalMessage = new SignalMessage
+            {
+                Ciphertext = ciphertext,
+                Mac = mac,
+                SenderIdentityKey = remoteIdentityKey,
+                SenderEphemeralKey = receivingRatchetKey,
+                MessageNumber = 0,
+                RatchetKey = receivingRatchetKey
+            };
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(
@@ -185,79 +291,64 @@ namespace SignalSharp.Tests.Security
         public async Task RatchetSendingAsync_ShouldUpdateChainKeys()
         {
             // Arrange
-            var sessionState = new SessionState(
-                Guid.NewGuid().ToString(),
-                new byte[] { 1, 2, 3 }, // Local identity key
-                new byte[] { 4, 5, 6 }, // Remote identity key
-                new byte[] { 7, 8, 9 }, // Root key
-                new byte[] { 10, 11, 12 }, // Sending chain key
-                new byte[] { 13, 14, 15 }, // Receiving chain key
-                new byte[] { 16, 17, 18 }, // Sending ratchet key
-                new byte[] { 19, 20, 21 }); // Receiving ratchet key
+            var sessionId = "test-session";
+            var localIdentityKey = new byte[32];
+            var remoteIdentityKey = new byte[32];
+            var rootKey = new byte[32];
+            var sendingChainKey = new byte[32];
+            var receivingChainKey = new byte[32];
+            var sendingRatchetKey = new byte[32];
+            var receivingRatchetKey = new byte[32];
+            var newRatchetKey = new byte[32];
+            var sharedSecret = new byte[32];
+            var newSendingChainKey = new byte[32];
+            var newReceivingChainKey = new byte[32];
 
-            var newRatchetPublicKey = new byte[] { 1, 2, 3 };
-            var newRatchetPrivateKey = new byte[] { 4, 5, 6 };
-            var newSendingChainKey = new byte[] { 7, 8, 9 };
-            var sharedSecret = new byte[] { 10, 11, 12 };
+            // Initialize the arrays with non-zero values
+            new Random().NextBytes(localIdentityKey);
+            new Random().NextBytes(remoteIdentityKey);
+            new Random().NextBytes(rootKey);
+            new Random().NextBytes(sendingChainKey);
+            new Random().NextBytes(receivingChainKey);
+            new Random().NextBytes(sendingRatchetKey);
+            new Random().NextBytes(receivingRatchetKey);
+            new Random().NextBytes(newRatchetKey);
+            new Random().NextBytes(sharedSecret);
+            new Random().NextBytes(newSendingChainKey);
+            new Random().NextBytes(newReceivingChainKey);
+
+            var sessionState = new SessionState(
+                sessionId,
+                localIdentityKey,
+                remoteIdentityKey,
+                rootKey,
+                sendingChainKey,
+                receivingChainKey,
+                sendingRatchetKey,
+                receivingRatchetKey);
 
             _keyExchangeServiceMock
                 .Setup(x => x.GenerateKeyPairAsync())
-                .ReturnsAsync((newRatchetPublicKey, newRatchetPrivateKey));
+                .ReturnsAsync((newRatchetKey, newRatchetKey));
 
             _keyExchangeServiceMock
-                .Setup(x => x.ComputeSharedSecretAsync(
-                    It.Is<byte[]>(x => x == newRatchetPrivateKey),
-                    It.Is<byte[]>(x => x == sessionState.ReceivingRatchetKey)))
+                .Setup(x => x.ComputeSharedSecretAsync(newRatchetKey, receivingRatchetKey))
                 .ReturnsAsync(sharedSecret);
 
             _keyExchangeServiceMock
-                .Setup(x => x.DeriveSymmetricKeyAsync(It.Is<byte[]>(x => x == sharedSecret), It.IsAny<byte[]>()))
+                .Setup(x => x.DeriveSymmetricKeyAsync(sharedSecret, newRatchetKey))
                 .ReturnsAsync(newSendingChainKey);
 
             // Act
             var result = await _doubleRatchetService.RatchetSendingAsync(sessionState);
 
             // Assert
-            Assert.Equal(newRatchetPublicKey, result.SendingRatchetKey);
+            Assert.NotNull(result);
+            Assert.Equal(rootKey, result.RootKey);
             Assert.Equal(newSendingChainKey, result.SendingChainKey);
-            Assert.Equal(0u, result.SendingMessageNumber);
-        }
-
-        [Fact]
-        public async Task RatchetReceivingAsync_ShouldUpdateChainKeys()
-        {
-            // Arrange
-            var sessionState = new SessionState(
-                Guid.NewGuid().ToString(),
-                new byte[] { 1, 2, 3 }, // Local identity key
-                new byte[] { 4, 5, 6 }, // Remote identity key
-                new byte[] { 7, 8, 9 }, // Root key
-                new byte[] { 10, 11, 12 }, // Sending chain key
-                new byte[] { 13, 14, 15 }, // Receiving chain key
-                new byte[] { 16, 17, 18 }, // Sending ratchet key
-                new byte[] { 19, 20, 21 }); // Receiving ratchet key
-
-            var newRatchetKey = new byte[] { 1, 2, 3 };
-            var newReceivingChainKey = new byte[] { 4, 5, 6 };
-            var sharedSecret = new byte[] { 7, 8, 9 };
-
-            _keyExchangeServiceMock
-                .Setup(x => x.ComputeSharedSecretAsync(
-                    It.Is<byte[]>(x => x == sessionState.SendingRatchetKey),
-                    It.Is<byte[]>(x => x == newRatchetKey)))
-                .ReturnsAsync(sharedSecret);
-
-            _keyExchangeServiceMock
-                .Setup(x => x.DeriveSymmetricKeyAsync(It.Is<byte[]>(x => x == sharedSecret), It.IsAny<byte[]>()))
-                .ReturnsAsync(newReceivingChainKey);
-
-            // Act
-            var result = await _doubleRatchetService.RatchetReceivingAsync(sessionState, newRatchetKey);
-
-            // Assert
-            Assert.Equal(newRatchetKey, result.ReceivingRatchetKey);
-            Assert.Equal(newReceivingChainKey, result.ReceivingChainKey);
-            Assert.Equal(0u, result.ReceivingMessageNumber);
+            Assert.Equal(receivingChainKey, result.ReceivingChainKey);
+            Assert.Equal(newRatchetKey, result.SendingRatchetKey);
+            Assert.Equal(receivingRatchetKey, result.ReceivingRatchetKey);
         }
     }
 } 

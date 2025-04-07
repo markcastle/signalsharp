@@ -43,5 +43,25 @@ namespace SignalSharp.Core.Interfaces
         /// <returns>True if the hash matches, false otherwise.</returns>
         /// <exception cref="ArgumentNullException">Thrown when data, key, or hash is null.</exception>
         Task<bool> VerifyKeyedHashAsync(byte[] data, byte[] key, byte[] hash);
+
+        /// <summary>
+        /// Derives a key from the specified input using a key derivation function.
+        /// </summary>
+        /// <param name="input">The input data to derive the key from.</param>
+        /// <param name="salt">The salt to use in the key derivation.</param>
+        /// <param name="outputLength">The desired length of the derived key in bytes.</param>
+        /// <returns>The derived key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when input or salt is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when outputLength is less than 1.</exception>
+        Task<byte[]> DeriveKeyAsync(byte[] input, byte[] salt, int outputLength);
+
+        /// <summary>
+        /// Computes a Message Authentication Code (MAC) for the specified data.
+        /// </summary>
+        /// <param name="data">The data to compute the MAC for.</param>
+        /// <param name="key">The key to use for the MAC.</param>
+        /// <returns>The computed MAC.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when data or key is null.</exception>
+        Task<byte[]> ComputeMacAsync(byte[] data, byte[] key);
     }
 } 

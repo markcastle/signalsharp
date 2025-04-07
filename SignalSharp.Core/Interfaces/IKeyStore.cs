@@ -24,7 +24,7 @@ namespace SignalSharp.Core.Interfaces
         /// <param name="keyId">The identifier of the key to retrieve.</param>
         /// <returns>The retrieved key, or null if not found.</returns>
         /// <exception cref="ArgumentNullException">Thrown when keyId is null.</exception>
-        Task<byte[]> GetKeyAsync(string keyId);
+        Task<byte[]?> GetKeyAsync(string keyId);
 
         /// <summary>
         /// Deletes a key by its identifier.
@@ -46,13 +46,13 @@ namespace SignalSharp.Core.Interfaces
         /// Gets the identity key.
         /// </summary>
         /// <returns>The identity key, or null if not found.</returns>
-        Task<byte[]> GetIdentityKeyAsync();
+        Task<byte[]?> GetIdentityKeyAsync();
 
         /// <summary>
         /// Generates a new ephemeral key pair.
         /// </summary>
         /// <returns>The generated ephemeral key pair.</returns>
-        Task<byte[]> GenerateEphemeralKeyPairAsync();
+        Task<KeyPair> GenerateEphemeralKeyPairAsync();
 
         /// <summary>
         /// Stores a session state.
@@ -69,7 +69,7 @@ namespace SignalSharp.Core.Interfaces
         /// <param name="sessionId">The identifier of the session state to retrieve.</param>
         /// <returns>The retrieved session state, or null if not found.</returns>
         /// <exception cref="ArgumentNullException">Thrown when sessionId is null.</exception>
-        Task<SessionState> GetSessionStateAsync(string sessionId);
+        Task<SessionState?> GetSessionStateAsync(string sessionId);
 
         /// <summary>
         /// Deletes a session state by its identifier.
@@ -78,5 +78,27 @@ namespace SignalSharp.Core.Interfaces
         /// <returns>A task representing the asynchronous operation.</returns>
         /// <exception cref="ArgumentNullException">Thrown when sessionId is null.</exception>
         Task DeleteSessionStateAsync(string sessionId);
+
+        /// <summary>
+        /// Gets a value from the key store.
+        /// </summary>
+        /// <param name="key">The key to retrieve.</param>
+        /// <returns>The value associated with the key, or null if not found.</returns>
+        Task<string?> GetAsync(string key);
+
+        /// <summary>
+        /// Sets a value in the key store.
+        /// </summary>
+        /// <param name="key">The key to store.</param>
+        /// <param name="value">The value to store.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        Task SetAsync(string key, string value);
+
+        /// <summary>
+        /// Deletes a value from the key store.
+        /// </summary>
+        /// <param name="key">The key to delete.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        Task DeleteAsync(string key);
     }
 } 

@@ -19,19 +19,19 @@ namespace SignalSharp.Security.Services;
 /// </remarks>
 public class X3DHKeyAgreementService : IX3DHKeyAgreementService
 {
-    private readonly IHashService _hashService;
     private readonly IEcKeyExchangeService _keyExchangeService;
+    private readonly IHashService _hashService;
 
     /// <summary>
     /// Initializes a new instance of the X3DHKeyAgreementService.
     /// </summary>
-    /// <param name="hashService">The hash service used for key derivation.</param>
     /// <param name="keyExchangeService">The key exchange service for ECDH operations.</param>
+    /// <param name="hashService">The hash service used for key derivation.</param>
     /// <exception cref="ArgumentNullException">Thrown when any of the parameters are null.</exception>
-    public X3DHKeyAgreementService(IHashService hashService, IEcKeyExchangeService keyExchangeService)
+    public X3DHKeyAgreementService(IEcKeyExchangeService keyExchangeService, IHashService hashService)
     {
-        _hashService = hashService ?? throw new ArgumentNullException(nameof(hashService));
         _keyExchangeService = keyExchangeService ?? throw new ArgumentNullException(nameof(keyExchangeService));
+        _hashService = hashService ?? throw new ArgumentNullException(nameof(hashService));
     }
 
     /// <summary>
@@ -43,7 +43,8 @@ public class X3DHKeyAgreementService : IX3DHKeyAgreementService
     {
         try
         {
-            return await _keyExchangeService.GenerateKeyPairAsync();
+            var (publicKey, privateKey) = await _keyExchangeService.GenerateKeyPairAsync();
+            return new KeyPair(publicKey, privateKey);
         }
         catch (Exception ex)
         {
@@ -69,12 +70,12 @@ public class X3DHKeyAgreementService : IX3DHKeyAgreementService
 
         try
         {
-            var preKeyPair = await _keyExchangeService.GenerateKeyPairAsync();
-            var signature = await _keyExchangeService.SignAsync(identityKeyPair.PrivateKey, preKeyPair.PublicKey);
+            var (publicKey, privateKey) = await _keyExchangeService.GenerateKeyPairAsync();
+            var signature = await _keyExchangeService.SignAsync(identityKeyPair.PrivateKey, publicKey);
             
             // In a real implementation, we would store the prekey pair and its signature
             // For now, we'll just return the prekey pair
-            return preKeyPair;
+            return new KeyPair(publicKey, privateKey);
         }
         catch (Exception ex)
         {
@@ -91,7 +92,8 @@ public class X3DHKeyAgreementService : IX3DHKeyAgreementService
     {
         try
         {
-            return await _keyExchangeService.GenerateKeyPairAsync();
+            var (publicKey, privateKey) = await _keyExchangeService.GenerateKeyPairAsync();
+            return new KeyPair(publicKey, privateKey);
         }
         catch (Exception ex)
         {
@@ -118,40 +120,40 @@ public class X3DHKeyAgreementService : IX3DHKeyAgreementService
         byte[] recipientSignedPreKey,
         byte[]? recipientOneTimePreKey = null)
     {
-        if (initiatorIdentityKey == null)
-            throw new ArgumentNullException(nameof(initiatorIdentityKey));
-        if (initiatorEphemeralKey == null)
-            throw new ArgumentNullException(nameof(initiatorEphemeralKey));
-        if (recipientIdentityKey == null)
-            throw new ArgumentNullException(nameof(recipientIdentityKey));
-        if (recipientSignedPreKey == null)
-            throw new ArgumentNullException(nameof(recipientSignedPreKey));
-
-        if (initiatorIdentityKey.Length == 0)
-            throw new ArgumentException("Identity public key cannot be empty", nameof(initiatorIdentityKey));
-        if (initiatorEphemeralKey.Length == 0)
-            throw new ArgumentException("Ephemeral public key cannot be empty", nameof(initiatorEphemeralKey));
-        if (recipientIdentityKey.Length == 0)
-            throw new ArgumentException("Identity public key cannot be empty", nameof(recipientIdentityKey));
-        if (recipientSignedPreKey.Length == 0)
-            throw new ArgumentException("Signed prekey public key cannot be empty", nameof(recipientSignedPreKey));
-
         try
         {
-            // 1. DH1 = DH(I_A, E_B) - Initiator's identity key with recipient's ephemeral key
+            // Validate input parameters
+            if (initiatorIdentityKey == null || initiatorIdentityKey.Length == 0)
+                throw new ArgumentException("Initiator identity key cannot be empty", nameof(initiatorIdentityKey));
+            if (initiatorEphemeralKey == null || initiatorEphemeralKey.Length == 0)
+                throw new ArgumentException("Initiator ephemeral key cannot be empty", nameof(initiatorEphemeralKey));
+            if (recipientIdentityKey == null || recipientIdentityKey.Length == 0)
+                throw new ArgumentException("Recipient identity key cannot be empty", nameof(recipientIdentityKey));
+            if (recipientSignedPreKey == null || recipientSignedPreKey.Length == 0)
+                throw new ArgumentException("Recipient signed prekey cannot be empty", nameof(recipientSignedPreKey));
+
+            // 1. DH1 = DH(I_A, E_B) - Initiator's identity key with recipient's signed prekey
             var dh1 = await _keyExchangeService.ComputeSharedSecretAsync(initiatorIdentityKey, recipientSignedPreKey);
+            if (dh1 == null || dh1.Length == 0)
+                throw new InvalidOperationException("Failed to compute DH1");
 
             // 2. DH2 = DH(E_A, I_B) - Initiator's ephemeral key with recipient's identity key
             var dh2 = await _keyExchangeService.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientIdentityKey);
+            if (dh2 == null || dh2.Length == 0)
+                throw new InvalidOperationException("Failed to compute DH2");
 
-            // 3. DH3 = DH(E_A, E_B) - Initiator's ephemeral key with recipient's ephemeral key
+            // 3. DH3 = DH(E_A, E_B) - Initiator's ephemeral key with recipient's signed prekey
             var dh3 = await _keyExchangeService.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientSignedPreKey);
+            if (dh3 == null || dh3.Length == 0)
+                throw new InvalidOperationException("Failed to compute DH3");
 
             // 4. DH4 = DH(E_A, E_B) - Initiator's ephemeral key with recipient's one-time prekey (if available)
             byte[]? dh4 = null;
-            if (recipientOneTimePreKey != null)
+            if (recipientOneTimePreKey != null && recipientOneTimePreKey.Length > 0)
             {
                 dh4 = await _keyExchangeService.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientOneTimePreKey);
+                if (dh4 == null || dh4.Length == 0)
+                    throw new InvalidOperationException("Failed to compute DH4");
             }
 
             // Combine all shared secrets
@@ -162,7 +164,11 @@ public class X3DHKeyAgreementService : IX3DHKeyAgreementService
             }
 
             // Use the combined shared secrets to derive the final key
-            return await _hashService.ComputeKeyedHashAsync(combinedInput.ToArray(), initiatorIdentityKey);
+            var finalKey = await _hashService.ComputeKeyedHashAsync(combinedInput.ToArray(), initiatorIdentityKey);
+            if (finalKey == null || finalKey.Length == 0)
+                throw new InvalidOperationException("Failed to derive final key");
+
+            return finalKey;
         }
         catch (Exception ex)
         {

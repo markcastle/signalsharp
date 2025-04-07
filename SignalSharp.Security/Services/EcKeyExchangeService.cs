@@ -10,7 +10,7 @@ namespace SignalSharp.Security.Services
     /// <summary>
     /// Provides ECDH-based key exchange operations.
     /// </summary>
-    public class EcKeyExchangeService : IKeyExchangeService
+    public class EcKeyExchangeService : IEcKeyExchangeService
     {
         /// <summary>
         /// Generates a new ECDH key pair.
@@ -27,17 +27,82 @@ namespace SignalSharp.Security.Services
         }
 
         /// <summary>
+        /// Signs data using a private key.
+        /// </summary>
+        /// <param name="privateKey">The private key to sign with.</param>
+        /// <param name="data">The data to sign.</param>
+        /// <returns>The signature.</returns>
+        public async Task<byte[]> SignAsync(byte[] privateKey, byte[] data)
+        {
+            if (privateKey == null) throw new ArgumentNullException(nameof(privateKey));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+
+            return await Task.Run(() =>
+            {
+                using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+                var parameters = new ECParameters
+                {
+                    Curve = ECCurve.NamedCurves.nistP256,
+                    D = privateKey
+                };
+                ecdsa.ImportParameters(parameters);
+                return ecdsa.SignData(data, HashAlgorithmName.SHA256);
+            });
+        }
+
+        /// <summary>
+        /// Verifies a signature using a public key.
+        /// </summary>
+        /// <param name="publicKey">The public key to verify with.</param>
+        /// <param name="data">The data that was signed.</param>
+        /// <param name="signature">The signature to verify.</param>
+        /// <returns>True if the signature is valid, false otherwise.</returns>
+        public async Task<bool> VerifyAsync(byte[] publicKey, byte[] data, byte[] signature)
+        {
+            if (publicKey == null) throw new ArgumentNullException(nameof(publicKey));
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (signature == null) throw new ArgumentNullException(nameof(signature));
+
+            return await Task.Run(() =>
+            {
+                using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+                var parameters = new ECParameters
+                {
+                    Curve = ECCurve.NamedCurves.nistP256,
+                    Q = new ECPoint
+                    {
+                        X = publicKey.Take(32).ToArray(),
+                        Y = publicKey.Skip(32).ToArray()
+                    }
+                };
+                ecdsa.ImportParameters(parameters);
+                return ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA256);
+            });
+        }
+
+        /// <summary>
+        /// Performs a Diffie-Hellman key agreement.
+        /// </summary>
+        /// <param name="publicKey">The public key of the other party.</param>
+        /// <param name="privateKey">The private key of this party.</param>
+        /// <returns>The shared secret.</returns>
+        public Task<byte[]> DiffieHellmanAsync(byte[] publicKey, byte[] privateKey)
+        {
+            return ComputeSharedSecretAsync(privateKey, publicKey);
+        }
+
+        /// <summary>
         /// Computes a shared secret using ECDH.
         /// </summary>
         /// <param name="privateKey">The local private key.</param>
-        /// <param name="remotePublicKey">The remote public key.</param>
+        /// <param name="publicKey">The remote public key.</param>
         /// <returns>The computed shared secret.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when privateKey or remotePublicKey is null.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when privateKey or publicKey is null.</exception>
         /// <exception cref="CryptographicException">Thrown when key format is invalid.</exception>
-        public async Task<byte[]> ComputeSharedSecretAsync(byte[] privateKey, byte[] remotePublicKey)
+        public async Task<byte[]> ComputeSharedSecretAsync(byte[] privateKey, byte[] publicKey)
         {
             if (privateKey == null) throw new ArgumentNullException(nameof(privateKey));
-            if (remotePublicKey == null) throw new ArgumentNullException(nameof(remotePublicKey));
+            if (publicKey == null) throw new ArgumentNullException(nameof(publicKey));
 
             return await Task.Run(() =>
             {
@@ -48,8 +113,8 @@ namespace SignalSharp.Security.Services
                     D = privateKey,
                     Q = new ECPoint
                     {
-                        X = remotePublicKey.Take(32).ToArray(),
-                        Y = remotePublicKey.Skip(32).ToArray()
+                        X = publicKey.Take(32).ToArray(),
+                        Y = publicKey.Skip(32).ToArray()
                     }
                 };
 
@@ -61,8 +126,8 @@ namespace SignalSharp.Security.Services
                     Curve = ECCurve.NamedCurves.nistP256,
                     Q = new ECPoint
                     {
-                        X = remotePublicKey.Take(32).ToArray(),
-                        Y = remotePublicKey.Skip(32).ToArray()
+                        X = publicKey.Take(32).ToArray(),
+                        Y = publicKey.Skip(32).ToArray()
                     }
                 };
                 remoteEcdh.ImportParameters(remoteParameters);
@@ -78,13 +143,14 @@ namespace SignalSharp.Security.Services
         /// <param name="salt">Optional salt for key derivation.</param>
         /// <returns>The derived symmetric key.</returns>
         /// <exception cref="ArgumentNullException">Thrown when sharedSecret is null.</exception>
-        public async Task<byte[]> DeriveSymmetricKeyAsync(byte[] sharedSecret, byte[]? salt = default)
+        public async Task<byte[]> DeriveSymmetricKeyAsync(byte[] sharedSecret, byte[] salt)
         {
             if (sharedSecret == null) throw new ArgumentNullException(nameof(sharedSecret));
+            if (salt == null) throw new ArgumentNullException(nameof(salt));
 
             return await Task.Run(() =>
             {
-                var hkdf = new HKDF(sharedSecret, salt ?? GenerateSalt());
+                var hkdf = new HKDF(sharedSecret, salt);
                 return hkdf.DeriveKey(32); // 256 bits
             });
         }

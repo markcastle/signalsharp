@@ -31,5 +31,11 @@ namespace SignalSharp.Core.Interfaces
         /// </summary>
         /// <returns>A new encryption key.</returns>
         Task<byte[]> GenerateKeyAsync();
+
+        /// <summary>
+        /// Generates a new initialization vector (IV).
+        /// </summary>
+        /// <returns>A new initialization vector.</returns>
+        Task<byte[]> GenerateIvAsync();
     }
 } 

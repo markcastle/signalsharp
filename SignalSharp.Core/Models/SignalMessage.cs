@@ -10,6 +10,22 @@ namespace SignalSharp.Core.Models
         /// <summary>
         /// Initializes a new instance of the <see cref="SignalMessage"/> class.
         /// </summary>
+        public SignalMessage()
+        {
+            Type = MessageType.Regular;
+            Content = Array.Empty<byte>();
+            Mac = Array.Empty<byte>();
+            Iv = Array.Empty<byte>();
+            SenderIdentityKey = Array.Empty<byte>();
+            SenderEphemeralKey = Array.Empty<byte>();
+            Ciphertext = Array.Empty<byte>();
+            MessageNumber = 0;
+            RatchetKey = Array.Empty<byte>();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SignalMessage"/> class.
+        /// </summary>
         /// <param name="content">The encrypted message content.</param>
         /// <param name="mac">The message authentication code.</param>
         /// <param name="iv">The initialization vector used for encryption.</param>
@@ -27,6 +43,9 @@ namespace SignalSharp.Core.Models
             Iv = iv ?? throw new ArgumentNullException(nameof(iv));
             SenderIdentityKey = senderIdentityKey ?? throw new ArgumentNullException(nameof(senderIdentityKey));
             SenderEphemeralKey = senderEphemeralKey ?? throw new ArgumentNullException(nameof(senderEphemeralKey));
+            Ciphertext = Array.Empty<byte>();
+            MessageNumber = 0;
+            RatchetKey = Array.Empty<byte>();
 
             if (content.Length == 0)
                 throw new ArgumentException("Content cannot be empty.", nameof(content));
@@ -50,27 +69,27 @@ namespace SignalSharp.Core.Models
         /// <summary>
         /// Gets or sets the encrypted message content.
         /// </summary>
-        public byte[] Content { get; }
+        public byte[] Content { get; set; }
 
         /// <summary>
         /// Gets or sets the message authentication code.
         /// </summary>
-        public byte[] Mac { get; }
+        public byte[] Mac { get; set; }
 
         /// <summary>
         /// Gets or sets the initialization vector used for encryption.
         /// </summary>
-        public byte[] Iv { get; }
+        public byte[] Iv { get; set; }
 
         /// <summary>
         /// Gets or sets the sender's identity key.
         /// </summary>
-        public byte[] SenderIdentityKey { get; }
+        public byte[] SenderIdentityKey { get; set; }
 
         /// <summary>
         /// Gets or sets the sender's ephemeral key.
         /// </summary>
-        public byte[] SenderEphemeralKey { get; }
+        public byte[] SenderEphemeralKey { get; set; }
 
         /// <summary>
         /// Gets or sets the counter used in the ratchet.
@@ -81,6 +100,21 @@ namespace SignalSharp.Core.Models
         /// Gets or sets the previous counter value.
         /// </summary>
         public uint PreviousCounter { get; set; }
+
+        /// <summary>
+        /// Gets or sets the ciphertext of the message.
+        /// </summary>
+        public byte[] Ciphertext { get; set; }
+
+        /// <summary>
+        /// Gets or sets the message number in the ratchet chain.
+        /// </summary>
+        public uint MessageNumber { get; set; }
+
+        /// <summary>
+        /// Gets or sets the ratchet key used for this message.
+        /// </summary>
+        public byte[] RatchetKey { get; set; }
 
         /// <summary>
         /// Determines whether the specified object is equal to the current object.
@@ -99,7 +133,10 @@ namespace SignalSharp.Core.Models
                    SenderIdentityKey.AsSpan().SequenceEqual(other.SenderIdentityKey) &&
                    SenderEphemeralKey.AsSpan().SequenceEqual(other.SenderEphemeralKey) &&
                    Counter == other.Counter &&
-                   PreviousCounter == other.PreviousCounter;
+                   PreviousCounter == other.PreviousCounter &&
+                   Ciphertext.AsSpan().SequenceEqual(other.Ciphertext) &&
+                   MessageNumber == other.MessageNumber &&
+                   RatchetKey.AsSpan().SequenceEqual(other.RatchetKey);
         }
 
         /// <summary>
@@ -112,17 +149,18 @@ namespace SignalSharp.Core.Models
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != GetType()) return false;
+
             return Equals((SignalMessage)obj);
         }
 
         /// <summary>
-        /// Gets a hash code for the current object.
+        /// Serves as the default hash function.
         /// </summary>
         /// <returns>A hash code for the current object.</returns>
         public override int GetHashCode()
         {
             var hash = new HashCode();
-            hash.Add((int)Type);
+            hash.Add(Type);
             foreach (var b in Content)
                 hash.Add(b);
             foreach (var b in Mac)
@@ -135,6 +173,11 @@ namespace SignalSharp.Core.Models
                 hash.Add(b);
             hash.Add(Counter);
             hash.Add(PreviousCounter);
+            foreach (var b in Ciphertext)
+                hash.Add(b);
+            hash.Add(MessageNumber);
+            foreach (var b in RatchetKey)
+                hash.Add(b);
             return hash.ToHashCode();
         }
 

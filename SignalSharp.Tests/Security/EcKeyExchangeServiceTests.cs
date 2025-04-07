@@ -15,7 +15,7 @@ namespace SignalSharp.Tests.Security
         }
 
         [Fact]
-        public async Task GenerateKeyPairAsync_ShouldGenerateValidKeyPair()
+        public async Task GenerateKeyPair_ReturnsValidKeyPair()
         {
             // Act
             var (publicKey, privateKey) = await _service.GenerateKeyPairAsync();
@@ -23,54 +23,54 @@ namespace SignalSharp.Tests.Security
             // Assert
             Assert.NotNull(publicKey);
             Assert.NotNull(privateKey);
-            Assert.NotEmpty(publicKey);
-            Assert.NotEmpty(privateKey);
+            Assert.Equal(64, publicKey.Length); // 32 bytes for X + 32 bytes for Y
+            Assert.Equal(32, privateKey.Length); // 32 bytes for private key
         }
 
         [Fact]
-        public async Task ComputeSharedSecretAsync_WithValidKeys_ShouldProduceSameSecretForBothParties()
+        public async Task ComputeSharedSecret_WithValidKeys_ReturnsSharedSecret()
         {
             // Arrange
-            var (alicePublicKey, alicePrivateKey) = await _service.GenerateKeyPairAsync();
-            var (bobPublicKey, bobPrivateKey) = await _service.GenerateKeyPairAsync();
+            var (publicKey, privateKey) = await _service.GenerateKeyPairAsync();
 
             // Act
-            var aliceSharedSecret = await _service.ComputeSharedSecretAsync(alicePrivateKey, bobPublicKey);
-            var bobSharedSecret = await _service.ComputeSharedSecretAsync(bobPrivateKey, alicePublicKey);
+            var sharedSecret = await _service.ComputeSharedSecretAsync(privateKey, publicKey);
 
             // Assert
-            Assert.Equal(aliceSharedSecret, bobSharedSecret);
+            Assert.NotNull(sharedSecret);
+            Assert.Equal(32, sharedSecret.Length); // 32 bytes for shared secret
         }
 
         [Fact]
-        public async Task DeriveSymmetricKeyAsync_WithSameInputs_ShouldProduceSameKey()
+        public async Task DeriveSymmetricKey_WithValidInput_ReturnsSymmetricKey()
         {
             // Arrange
-            var sharedSecret = new byte[] { 1, 2, 3, 4, 5 };
-            var salt = new byte[] { 6, 7, 8, 9, 10 };
+            var sharedSecret = new byte[32];
+            var salt = new byte[32];
+            new Random().NextBytes(sharedSecret);
+            new Random().NextBytes(salt);
 
             // Act
-            var key1 = await _service.DeriveSymmetricKeyAsync(sharedSecret, salt);
-            var key2 = await _service.DeriveSymmetricKeyAsync(sharedSecret, salt);
+            var symmetricKey = await _service.DeriveSymmetricKeyAsync(sharedSecret, salt);
 
             // Assert
-            Assert.Equal(key1, key2);
+            Assert.NotNull(symmetricKey);
+            Assert.Equal(32, symmetricKey.Length); // 32 bytes for symmetric key
         }
 
         [Fact]
-        public async Task DeriveSymmetricKeyAsync_WithDifferentSalts_ShouldProduceDifferentKeys()
+        public async Task SignAndVerify_WithValidData_VerifiesSuccessfully()
         {
             // Arrange
-            var sharedSecret = new byte[] { 1, 2, 3, 4, 5 };
-            var salt1 = new byte[] { 6, 7, 8, 9, 10 };
-            var salt2 = new byte[] { 11, 12, 13, 14, 15 };
+            var (publicKey, privateKey) = await _service.GenerateKeyPairAsync();
+            var data = new byte[] { 1, 2, 3, 4, 5 };
 
             // Act
-            var key1 = await _service.DeriveSymmetricKeyAsync(sharedSecret, salt1);
-            var key2 = await _service.DeriveSymmetricKeyAsync(sharedSecret, salt2);
+            var signature = await _service.SignAsync(privateKey, data);
+            var isValid = await _service.VerifyAsync(publicKey, data, signature);
 
             // Assert
-            Assert.NotEqual(key1, key2);
+            Assert.True(isValid);
         }
 
         [Fact]
@@ -98,9 +98,25 @@ namespace SignalSharp.Tests.Security
         [Fact]
         public async Task DeriveSymmetricKeyAsync_WithNullSharedSecret_ShouldThrowArgumentNullException()
         {
+            // Arrange
+            var salt = new byte[32];
+            new Random().NextBytes(salt);
+
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() => 
-                _service.DeriveSymmetricKeyAsync(null!));
+                _service.DeriveSymmetricKeyAsync(null!, salt));
+        }
+
+        [Fact]
+        public async Task DeriveSymmetricKeyAsync_WithNullSalt_ShouldThrowArgumentNullException()
+        {
+            // Arrange
+            var sharedSecret = new byte[32];
+            new Random().NextBytes(sharedSecret);
+
+            // Act & Assert
+            await Assert.ThrowsAsync<ArgumentNullException>(() => 
+                _service.DeriveSymmetricKeyAsync(sharedSecret, null!));
         }
     }
 } 

@@ -26,22 +26,22 @@ namespace SignalSharp.Tests.Core.Models
         public void Constructor_WithNullPublicKey_ShouldThrowArgumentNullException()
         {
             // Arrange
-            byte[] publicKey = null;
-            var privateKey = new byte[] { 6, 7, 8, 9, 10 };
+            byte[]? publicKey = null;
+            byte[] privateKey = new byte[32];
 
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => new KeyPair(publicKey, privateKey));
+            Assert.Throws<ArgumentNullException>(() => new KeyPair(publicKey!, privateKey));
         }
 
         [Fact]
         public void Constructor_WithNullPrivateKey_ShouldThrowArgumentNullException()
         {
             // Arrange
-            var publicKey = new byte[] { 1, 2, 3, 4, 5 };
-            byte[] privateKey = null;
+            byte[] publicKey = new byte[32];
+            byte[]? privateKey = null;
 
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => new KeyPair(publicKey, privateKey));
+            Assert.Throws<ArgumentNullException>(() => new KeyPair(publicKey, privateKey!));
         }
 
         [Fact]
