@@ -11,12 +11,6 @@
   - [ ] Verify protection against known attack vectors
   - [ ] Consider third-party security review
 
-- [ ] Address System.Text.Json vulnerabilities
-  - [ ] Monitor for official fix for GHSA-8g4q-xg66-9fp4
-  - [ ] Evaluate alternative JSON serialization libraries
-  - [ ] Implement additional mitigations if needed
-  - [ ] Update documentation on security considerations
-
 ### Medium Priority
 - [ ] Create console test application
   - [ ] Create SignalSharp.Demo project
@@ -55,16 +49,6 @@
   - [ ] Add code samples for common use cases
   - [ ] Document best practices and patterns
   - [ ] Create integration guides for common scenarios
-
-- [x] Create dependency injection project
-  - [x] Create SignalSharp.DependencyInjection project
-  - [x] Implement extension methods for IServiceCollection
-  - [x] Add configuration options for services
-  - [x] Create factory methods for common scenarios
-  - [x] Add support for different storage backends
-  - [x] Add support for different JSON serializers
-  - [x] Add unit tests for dependency injection
-  - [x] Document dependency injection usage
 
 ### Lower Priority
 - [ ] Improve error handling and debugging
@@ -155,6 +139,20 @@
   - [x] Add support for different JSON serializers
   - [x] Add unit tests for dependency injection
   - [x] Document dependency injection usage
+- [x] Create dependency injection project
+  - [x] Create SignalSharp.DependencyInjection project
+  - [x] Implement extension methods for IServiceCollection
+  - [x] Add configuration options for services
+  - [x] Create factory methods for common scenarios
+  - [x] Add support for different storage backends
+  - [x] Add support for different JSON serializers
+  - [x] Add unit tests for dependency injection
+  - [x] Document dependency injection usage
+- [X] Address System.Text.Json vulnerabilities
+  - [X] Monitor for official fix for GHSA-8g4q-xg66-9fp4
+  - [X] Evaluate alternative JSON serialization libraries
+  - [X] Implement additional mitigations if needed
+  - [X] Update documentation on security considerations
 
 ## Discovered During Work
 
@@ -198,17 +196,3 @@
 - [ ] Performance optimization
 
 ## Known Issues and Future Tasks
-
-### Security
-- Known high severity vulnerabilities in System.Text.Json package:
-  - GHSA-8g4q-xg66-9fp4 (High severity)
-  - GHSA-hh2w-p6rv-4g7w (High severity)
-  - Currently used only in test environment, but should be monitored for updates
-  - Status: Active monitoring for official fix
-  - Impact: Potential denial of service vulnerability
-  - Options:
-    1. Wait for official fix
-    2. Consider alternative JSON serialization libraries (Newtonsoft.Json, Jil, etc.)
-  - Priority: High
-  - Added: 2024-03-20
-  - Status: Addressed by implementing JSON serialization abstraction 
