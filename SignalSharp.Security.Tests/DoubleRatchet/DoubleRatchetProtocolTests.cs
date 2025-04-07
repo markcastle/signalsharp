@@ -43,10 +43,11 @@ namespace SignalSharp.Security.Tests.DoubleRatchet
             var receivingChainKey = new byte[32];
 
             _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
-                .ReturnsAsync(sharedSecret);
-            _hashServiceMock.Setup(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
-                .ReturnsAsync(sendingChainKey)
-                .ReturnsAsync(receivingChainKey);
+                .Returns(Task.FromResult(sharedSecret));
+
+            var hashServiceSequence = _hashServiceMock.SetupSequence(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()));
+            hashServiceSequence.Returns(Task.FromResult(sendingChainKey));
+            hashServiceSequence.Returns(Task.FromResult(receivingChainKey));
 
             // Act
             var result = await _service.InitializeSessionAsync(rootKey, sendingRatchetKey, receivingRatchetKey);
@@ -73,13 +74,15 @@ namespace SignalSharp.Security.Tests.DoubleRatchet
             var encryptedMessage = new byte[64];
             var mac = new byte[32];
 
-            _hashServiceMock.Setup(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
-                .ReturnsAsync(messageKey)
-                .ReturnsAsync(newChainKey);
+            var hashServiceSequence = _hashServiceMock.SetupSequence(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()));
+            hashServiceSequence.Returns(Task.FromResult(messageKey));
+            hashServiceSequence.Returns(Task.FromResult(newChainKey));
+
             _encryptionServiceMock.Setup(x => x.EncryptAsync(message, messageKey))
-                .ReturnsAsync(encryptedMessage);
+                .Returns(Task.FromResult(encryptedMessage));
+
             _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(encryptedMessage, messageKey))
-                .ReturnsAsync(mac);
+                .Returns(Task.FromResult(mac));
 
             // Act
             var (result, updatedState) = await _service.EncryptMessageAsync(sessionState, message);
@@ -108,13 +111,15 @@ namespace SignalSharp.Security.Tests.DoubleRatchet
             var newChainKey = new byte[32];
             var decryptedMessage = new byte[32];
 
-            _hashServiceMock.Setup(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
-                .ReturnsAsync(messageKey)
-                .ReturnsAsync(newChainKey);
+            var hashServiceSequence = _hashServiceMock.SetupSequence(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()));
+            hashServiceSequence.Returns(Task.FromResult(messageKey));
+            hashServiceSequence.Returns(Task.FromResult(newChainKey));
+
             _hashServiceMock.Setup(x => x.VerifyKeyedHashAsync(message.Ciphertext, messageKey, message.Mac))
-                .ReturnsAsync(true);
+                .Returns(Task.FromResult(true));
+
             _encryptionServiceMock.Setup(x => x.DecryptAsync(message.Ciphertext, messageKey))
-                .ReturnsAsync(decryptedMessage);
+                .Returns(Task.FromResult(decryptedMessage));
 
             // Act
             var (result, updatedState) = await _service.DecryptMessageAsync(sessionState, message);
@@ -138,9 +143,10 @@ namespace SignalSharp.Security.Tests.DoubleRatchet
             };
 
             _hashServiceMock.Setup(x => x.DeriveKeyAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<int>()))
-                .ReturnsAsync(new byte[32]);
+                .Returns(Task.FromResult(new byte[32]));
+
             _hashServiceMock.Setup(x => x.VerifyKeyedHashAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>(), It.IsAny<byte[]>()))
-                .ReturnsAsync(false);
+                .Returns(Task.FromResult(false));
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() => 
@@ -157,11 +163,13 @@ namespace SignalSharp.Security.Tests.DoubleRatchet
             var newChainKey = new byte[32];
 
             _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
-                .ReturnsAsync((newRatchetKey, new byte[32]));
+                .Returns(Task.FromResult((newRatchetKey, new byte[32])));
+
             _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
-                .ReturnsAsync(sharedSecret);
+                .Returns(Task.FromResult(sharedSecret));
+
             _keyExchangeServiceMock.Setup(x => x.DeriveSymmetricKeyAsync(sharedSecret, newRatchetKey))
-                .ReturnsAsync(newChainKey);
+                .Returns(Task.FromResult(newChainKey));
 
             // Act
             var result = await _service.RatchetSendingAsync(sessionState);

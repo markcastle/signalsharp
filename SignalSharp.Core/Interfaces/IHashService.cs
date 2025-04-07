@@ -56,6 +56,18 @@ namespace SignalSharp.Core.Interfaces
         Task<byte[]> DeriveKeyAsync(byte[] input, byte[] salt, int outputLength);
 
         /// <summary>
+        /// Derives a key from the specified input using a key derivation function with additional info parameter.
+        /// </summary>
+        /// <param name="input">The input data to derive the key from.</param>
+        /// <param name="salt">The salt to use in the key derivation.</param>
+        /// <param name="outputLength">The desired length of the derived key in bytes.</param>
+        /// <param name="info">Additional info parameter for the key derivation.</param>
+        /// <returns>The derived key.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when input or salt is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when outputLength is less than 1.</exception>
+        Task<byte[]> DeriveKeyAsync(byte[] input, byte[] salt, int outputLength, byte[] info);
+
+        /// <summary>
         /// Computes a Message Authentication Code (MAC) for the specified data.
         /// </summary>
         /// <param name="data">The data to compute the MAC for.</param>

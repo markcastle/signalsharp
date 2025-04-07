@@ -12,6 +12,8 @@ namespace SignalSharp.Security.Services
     /// </summary>
     public class EcKeyExchangeService : IEcKeyExchangeService
     {
+        private const int ExpectedKeyLength = 32; // 256 bits for NIST P-256
+
         /// <summary>
         /// Generates a new ECDH key pair.
         /// </summary>
@@ -22,6 +24,14 @@ namespace SignalSharp.Security.Services
             {
                 using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
                 var parameters = ecdh.ExportParameters(true);
+                
+                // Validate key lengths
+                if (parameters.D?.Length != ExpectedKeyLength)
+                    throw new InvalidOperationException($"Private key length must be {ExpectedKeyLength} bytes");
+                
+                if (parameters.Q.X?.Length != ExpectedKeyLength || parameters.Q.Y?.Length != ExpectedKeyLength)
+                    throw new InvalidOperationException($"Public key X and Y coordinates must be {ExpectedKeyLength} bytes each");
+
                 return (parameters.Q.X.Concat(parameters.Q.Y).ToArray(), parameters.D);
             });
         }
@@ -36,6 +46,8 @@ namespace SignalSharp.Security.Services
         {
             if (privateKey == null) throw new ArgumentNullException(nameof(privateKey));
             if (data == null) throw new ArgumentNullException(nameof(data));
+            if (privateKey.Length != ExpectedKeyLength)
+                throw new ArgumentException($"Private key must be {ExpectedKeyLength} bytes", nameof(privateKey));
 
             return await Task.Run(() =>
             {
@@ -62,6 +74,8 @@ namespace SignalSharp.Security.Services
             if (publicKey == null) throw new ArgumentNullException(nameof(publicKey));
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (signature == null) throw new ArgumentNullException(nameof(signature));
+            if (publicKey.Length != ExpectedKeyLength * 2)
+                throw new ArgumentException($"Public key must be {ExpectedKeyLength * 2} bytes", nameof(publicKey));
 
             return await Task.Run(() =>
             {
@@ -71,8 +85,8 @@ namespace SignalSharp.Security.Services
                     Curve = ECCurve.NamedCurves.nistP256,
                     Q = new ECPoint
                     {
-                        X = publicKey.Take(32).ToArray(),
-                        Y = publicKey.Skip(32).ToArray()
+                        X = publicKey.Take(ExpectedKeyLength).ToArray(),
+                        Y = publicKey.Skip(ExpectedKeyLength).ToArray()
                     }
                 };
                 ecdsa.ImportParameters(parameters);
@@ -98,41 +112,44 @@ namespace SignalSharp.Security.Services
         /// <param name="publicKey">The remote public key.</param>
         /// <returns>The computed shared secret.</returns>
         /// <exception cref="ArgumentNullException">Thrown when privateKey or publicKey is null.</exception>
-        /// <exception cref="CryptographicException">Thrown when key format is invalid.</exception>
+        /// <exception cref="ArgumentException">Thrown when key format is invalid.</exception>
         public async Task<byte[]> ComputeSharedSecretAsync(byte[] privateKey, byte[] publicKey)
         {
             if (privateKey == null) throw new ArgumentNullException(nameof(privateKey));
             if (publicKey == null) throw new ArgumentNullException(nameof(publicKey));
+            if (privateKey.Length != ExpectedKeyLength)
+                throw new ArgumentException($"Private key must be {ExpectedKeyLength} bytes", nameof(privateKey));
+            if (publicKey.Length != ExpectedKeyLength * 2)
+                throw new ArgumentException($"Public key must be {ExpectedKeyLength * 2} bytes", nameof(publicKey));
 
             return await Task.Run(() =>
             {
-                using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
-                var parameters = new ECParameters
+                // Create local ECDH instance with private key
+                using var localEcdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+                var localParameters = new ECParameters
                 {
                     Curve = ECCurve.NamedCurves.nistP256,
-                    D = privateKey,
-                    Q = new ECPoint
-                    {
-                        X = publicKey.Take(32).ToArray(),
-                        Y = publicKey.Skip(32).ToArray()
-                    }
+                    D = privateKey
                 };
+                localEcdh.ImportParameters(localParameters);
 
-                ecdh.ImportParameters(parameters);
-
-                using var remoteEcdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
+                // Create remote public key parameters
                 var remoteParameters = new ECParameters
                 {
                     Curve = ECCurve.NamedCurves.nistP256,
                     Q = new ECPoint
                     {
-                        X = publicKey.Take(32).ToArray(),
-                        Y = publicKey.Skip(32).ToArray()
+                        X = publicKey.Take(ExpectedKeyLength).ToArray(),
+                        Y = publicKey.Skip(ExpectedKeyLength).ToArray()
                     }
                 };
+
+                // Create remote ECDH instance with public key
+                using var remoteEcdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP256);
                 remoteEcdh.ImportParameters(remoteParameters);
 
-                return ecdh.DeriveKeyMaterial(remoteEcdh.PublicKey);
+                // Derive shared secret
+                return localEcdh.DeriveKeyMaterial(remoteEcdh.PublicKey);
             });
         }
 
@@ -181,30 +198,13 @@ namespace SignalSharp.Security.Services
             // Compute DH2 = DH(EKa, IKb)
             var dh2 = await ComputeSharedSecretAsync(ephemeralPrivateKey, remoteIdentityKey);
 
-            // Compute DH3 = DH(EKa, SPKb)
-            var dh3 = await ComputeSharedSecretAsync(ephemeralPrivateKey, remotePreKey);
-
-            // Concatenate shared secrets
-            var sharedSecret = new byte[dh1.Length + dh2.Length + dh3.Length];
-            Buffer.BlockCopy(dh1, 0, sharedSecret, 0, dh1.Length);
-            Buffer.BlockCopy(dh2, 0, sharedSecret, dh1.Length, dh2.Length);
-            Buffer.BlockCopy(dh3, 0, sharedSecret, dh1.Length + dh2.Length, dh3.Length);
-
             // Derive root key and chain keys
-            var hkdf = new HKDF(sharedSecret, GenerateSalt());
-            var rootKey = hkdf.DeriveKey(32);
-            var sendingChainKey = hkdf.DeriveKey(32);
-            var receivingChainKey = hkdf.DeriveKey(32);
+            var salt = new byte[32]; // Zero salt
+            var rootKey = await DeriveSymmetricKeyAsync(dh1.Concat(dh2).ToArray(), salt);
+            var sendingChainKey = await DeriveSymmetricKeyAsync(rootKey, ephemeralPublicKey);
+            var receivingChainKey = await DeriveSymmetricKeyAsync(rootKey, remotePreKey);
 
             return (rootKey, sendingChainKey, receivingChainKey);
-        }
-
-        private byte[] GenerateSalt()
-        {
-            var salt = new byte[32];
-            using var rng = new RNGCryptoServiceProvider();
-            rng.GetBytes(salt);
-            return salt;
         }
     }
 

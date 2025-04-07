@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using SignalSharp.Core.Interfaces;
 using SignalSharp.Core.Models;
@@ -20,6 +21,7 @@ namespace SignalSharp.Security.Services
         private readonly IEncryptionService _encryptionService;
         private readonly IEcKeyExchangeService _keyExchangeService;
         private readonly IHashService _hashService;
+        private const int KeyLength = 32; // 256 bits
 
         /// <summary>
         /// Initializes a new instance of the DoubleRatchetService class.
@@ -62,6 +64,8 @@ namespace SignalSharp.Security.Services
 
             // Perform key exchange
             var sharedSecret = await _keyExchangeService.ComputeSharedSecretAsync(ratchetPrivateKey, remoteRatchetKey);
+            if (sharedSecret == null || sharedSecret.Length == 0)
+                throw new InvalidOperationException("Failed to compute shared secret");
 
             // Derive chain keys
             var (sendingChainKey, receivingChainKey) = await DeriveChainKeysAsync(rootKey, sharedSecret, isInitiator);
@@ -80,14 +84,20 @@ namespace SignalSharp.Security.Services
         /// <exception cref="ArgumentOutOfRangeException">Thrown when messageNumber is negative.</exception>
         public async Task<(byte[] newChainKey, byte[] messageKey)> RatchetStepAsync(
             byte[] chainKey,
-            int messageNumber)
+            uint messageNumber)
         {
             if (chainKey == null) throw new ArgumentNullException(nameof(chainKey));
             if (chainKey.Length == 0) throw new ArgumentException("Chain key cannot be empty", nameof(chainKey));
-            if (messageNumber < 0) throw new ArgumentOutOfRangeException(nameof(messageNumber), "Message number cannot be negative");
 
-            // Derive message key and new chain key
-            var (newChainKey, messageKey) = await DeriveMessageKeyAsync(chainKey, messageNumber);
+            // Derive message key
+            var messageKey = await _hashService.DeriveKeyAsync(chainKey, System.Text.Encoding.UTF8.GetBytes($"message_{messageNumber}"), KeyLength);
+            if (messageKey == null || messageKey.Length == 0)
+                throw new InvalidOperationException("Failed to derive message key");
+
+            // Derive new chain key
+            var newChainKey = await _hashService.DeriveKeyAsync(chainKey, System.Text.Encoding.UTF8.GetBytes("chain"), KeyLength);
+            if (newChainKey == null || newChainKey.Length == 0)
+                throw new InvalidOperationException("Failed to derive new chain key");
 
             return (newChainKey, messageKey);
         }
@@ -117,6 +127,11 @@ namespace SignalSharp.Security.Services
                    await DeriveChainKeyAsync(rootKey, sharedSecret, "receiving"))
                 : (await DeriveChainKeyAsync(rootKey, sharedSecret, "receiving"),
                    await DeriveChainKeyAsync(rootKey, sharedSecret, "sending"));
+
+            if (sendingChainKey == null || sendingChainKey.Length == 0)
+                throw new InvalidOperationException("Failed to derive sending chain key");
+            if (receivingChainKey == null || receivingChainKey.Length == 0)
+                throw new InvalidOperationException("Failed to derive receiving chain key");
 
             return (sendingChainKey, receivingChainKey);
         }
@@ -149,33 +164,11 @@ namespace SignalSharp.Security.Services
             Buffer.BlockCopy(sharedSecret, 0, combined, rootKey.Length, sharedSecret.Length);
 
             // Derive chain key using HKDF
-            return await _hashService.DeriveKeyAsync(combined, System.Text.Encoding.UTF8.GetBytes(purpose), 32);
-        }
+            var chainKey = await _hashService.DeriveKeyAsync(combined, System.Text.Encoding.UTF8.GetBytes(purpose), KeyLength);
+            if (chainKey == null || chainKey.Length == 0)
+                throw new InvalidOperationException($"Failed to derive {purpose} chain key");
 
-        /// <summary>
-        /// Derives a message key and new chain key from the current chain key.
-        /// </summary>
-        /// <param name="chainKey">The current chain key.</param>
-        /// <param name="messageNumber">The message number for key derivation.</param>
-        /// <returns>A tuple containing the new chain key and message key.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when chainKey is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when chainKey is empty.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown when messageNumber is negative.</exception>
-        private async Task<(byte[] newChainKey, byte[] messageKey)> DeriveMessageKeyAsync(
-            byte[] chainKey,
-            int messageNumber)
-        {
-            if (chainKey == null) throw new ArgumentNullException(nameof(chainKey));
-            if (chainKey.Length == 0) throw new ArgumentException("Chain key cannot be empty", nameof(chainKey));
-            if (messageNumber < 0) throw new ArgumentOutOfRangeException(nameof(messageNumber), "Message number cannot be negative");
-
-            // Derive message key
-            var messageKey = await _hashService.DeriveKeyAsync(chainKey, System.Text.Encoding.UTF8.GetBytes($"message_{messageNumber}"), 32);
-
-            // Derive new chain key
-            var newChainKey = await _hashService.DeriveKeyAsync(chainKey, System.Text.Encoding.UTF8.GetBytes("chain"), 32);
-
-            return (newChainKey, messageKey);
+            return chainKey;
         }
 
         /// <inheritdoc/>
@@ -221,86 +214,109 @@ namespace SignalSharp.Security.Services
         /// <inheritdoc/>
         public async Task<(SignalMessage Message, SessionState UpdatedState)> EncryptMessageAsync(SessionState sessionState, byte[] message)
         {
-            if (sessionState == null) throw new ArgumentNullException(nameof(sessionState));
-            if (message == null) throw new ArgumentNullException(nameof(message));
+            if (sessionState == null)
+                throw new ArgumentNullException(nameof(sessionState));
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+            if (sessionState.SendingChainKey == null || sessionState.SendingChainKey.Length == 0)
+                throw new InvalidOperationException("Sending chain key cannot be empty");
+            if (sessionState.SendingRatchetKey == null || sessionState.SendingRatchetKey.Length == 0)
+                throw new InvalidOperationException("Sending ratchet key cannot be empty");
 
-            // Derive message key
-            var (newChainKey, messageKey) = await RatchetStepAsync(sessionState.SendingChainKey, (int)sessionState.SendingMessageNumber);
-
-            // Encrypt message
-            var encryptedMessage = await _encryptionService.EncryptAsync(message, messageKey);
-
-            // Create signal message
-            var signalMessage = new SignalMessage
+            try
             {
-                Ciphertext = encryptedMessage,
-                MessageNumber = sessionState.SendingMessageNumber,
-                RatchetKey = sessionState.SendingRatchetKey
-            };
+                // Perform ratchet step to get message key and new chain key
+                var (newChainKey, messageKey) = await RatchetStepAsync(sessionState.SendingChainKey, sessionState.SendingMessageNumber);
 
-            // Update session state
-            var updatedState = new SessionState(
-                sessionState.SessionId,
-                sessionState.LocalIdentityKey,
-                sessionState.RemoteIdentityKey,
-                sessionState.RootKey,
-                newChainKey,
-                sessionState.ReceivingChainKey,
-                sessionState.SendingRatchetKey,
-                sessionState.ReceivingRatchetKey)
+                // Encrypt message
+                var encryptedMessage = await _encryptionService.EncryptAsync(message, messageKey);
+                if (encryptedMessage == null || encryptedMessage.Length == 0)
+                    throw new InvalidOperationException("Failed to encrypt message");
+
+                // Compute MAC using message key
+                var mac = await _hashService.ComputeKeyedHashAsync(encryptedMessage, messageKey);
+                if (mac == null || mac.Length == 0)
+                    throw new InvalidOperationException("Failed to compute MAC");
+
+                // Create signal message
+                var signalMessage = new SignalMessage
+                {
+                    RatchetKey = sessionState.SendingRatchetKey,
+                    MessageNumber = sessionState.SendingMessageNumber,
+                    Ciphertext = encryptedMessage,
+                    Mac = mac
+                };
+
+                // Update session state
+                var updatedState = new SessionState(
+                    sessionState.SessionId,
+                    sessionState.LocalIdentityKey,
+                    sessionState.RemoteIdentityKey,
+                    sessionState.RootKey,
+                    newChainKey,
+                    sessionState.ReceivingChainKey,
+                    sessionState.SendingRatchetKey,
+                    sessionState.ReceivingRatchetKey)
+                {
+                    SendingMessageNumber = sessionState.SendingMessageNumber + 1
+                };
+
+                return (signalMessage, updatedState);
+            }
+            catch (Exception ex)
             {
-                SendingMessageNumber = sessionState.SendingMessageNumber + 1,
-                ReceivingMessageNumber = sessionState.ReceivingMessageNumber,
-                PreviousSendingMessageNumber = sessionState.PreviousSendingMessageNumber,
-                PreviousReceivingMessageNumber = sessionState.PreviousReceivingMessageNumber
-            };
-
-            return (signalMessage, updatedState);
+                throw new InvalidOperationException("Failed to encrypt message", ex);
+            }
         }
 
         /// <inheritdoc/>
         public async Task<(byte[] DecryptedMessage, SessionState UpdatedState)> DecryptMessageAsync(SessionState sessionState, SignalMessage message)
         {
-            if (sessionState == null) throw new ArgumentNullException(nameof(sessionState));
-            if (message == null) throw new ArgumentNullException(nameof(message));
+            if (sessionState == null)
+                throw new ArgumentNullException(nameof(sessionState));
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+            if (sessionState.ReceivingChainKey == null || sessionState.ReceivingChainKey.Length == 0)
+                throw new InvalidOperationException("Receiving chain key cannot be empty");
+            if (message.Ciphertext == null || message.Ciphertext.Length == 0)
+                throw new InvalidOperationException("Message ciphertext cannot be empty");
+            if (message.Mac == null || message.Mac.Length == 0)
+                throw new InvalidOperationException("Message MAC cannot be empty");
 
-            // Check if we need to ratchet
-            if (message.RatchetKey != null && !message.RatchetKey.AsSpan().SequenceEqual(sessionState.ReceivingRatchetKey))
+            try
             {
-                // Perform receiving ratchet
-                sessionState = await RatchetReceivingAsync(sessionState, message.RatchetKey);
+                // First perform ratchet step to get message key and new chain key
+                var (newChainKey, messageKey) = await RatchetStepAsync(sessionState.ReceivingChainKey, message.MessageNumber);
+
+                // Verify MAC
+                if (!await _hashService.VerifyKeyedHashAsync(message.Ciphertext, messageKey, message.Mac))
+                    throw new InvalidOperationException("Message authenticity verification failed");
+
+                // Decrypt message using message key
+                var decryptedMessage = await _encryptionService.DecryptAsync(message.Ciphertext, messageKey);
+                if (decryptedMessage == null || decryptedMessage.Length == 0)
+                    throw new InvalidOperationException("Failed to decrypt message");
+
+                // Update session state
+                var updatedState = new SessionState(
+                    sessionState.SessionId,
+                    sessionState.LocalIdentityKey,
+                    sessionState.RemoteIdentityKey,
+                    sessionState.RootKey,
+                    sessionState.SendingChainKey,
+                    newChainKey,
+                    sessionState.SendingRatchetKey,
+                    sessionState.ReceivingRatchetKey)
+                {
+                    ReceivingMessageNumber = message.MessageNumber + 1
+                };
+
+                return (decryptedMessage, updatedState);
             }
-
-            // Derive message key
-            var (newChainKey, messageKey) = await RatchetStepAsync(sessionState.ReceivingChainKey, (int)message.MessageNumber);
-
-            // Verify hash
-            if (message.Mac != null && !await _hashService.VerifyKeyedHashAsync(message.Ciphertext, messageKey, message.Mac))
+            catch (Exception ex)
             {
-                throw new InvalidOperationException("Message hash verification failed.");
+                throw new InvalidOperationException("Failed to decrypt message", ex);
             }
-
-            // Decrypt message
-            var decryptedMessage = await _encryptionService.DecryptAsync(message.Ciphertext, messageKey);
-
-            // Update session state
-            var updatedState = new SessionState(
-                sessionState.SessionId,
-                sessionState.LocalIdentityKey,
-                sessionState.RemoteIdentityKey,
-                sessionState.RootKey,
-                sessionState.SendingChainKey,
-                newChainKey,
-                sessionState.SendingRatchetKey,
-                sessionState.ReceivingRatchetKey)
-            {
-                SendingMessageNumber = sessionState.SendingMessageNumber,
-                ReceivingMessageNumber = message.MessageNumber + 1,
-                PreviousSendingMessageNumber = sessionState.PreviousSendingMessageNumber,
-                PreviousReceivingMessageNumber = sessionState.PreviousReceivingMessageNumber
-            };
-
-            return (decryptedMessage, updatedState);
         }
 
         /// <inheritdoc/>

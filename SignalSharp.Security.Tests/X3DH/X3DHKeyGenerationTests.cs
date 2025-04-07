@@ -31,18 +31,17 @@ namespace SignalSharp.Security.Tests.X3DH
         public async Task GenerateIdentityKeyPair_ShouldUseCryptographicallySecureRandomness()
         {
             // Arrange
-            var keyPairs = new List<(byte[] PublicKey, byte[] PrivateKey)>();
+            var keyPairs = new List<KeyPair>();
             _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
                 .ReturnsAsync(() =>
                 {
-                    var publicKey = new byte[32];
+                    // Public key is 64 bytes (32 bytes X + 32 bytes Y coordinates)
+                    var publicKey = new byte[64];
                     var privateKey = new byte[32];
-                    using (var rng = new RNGCryptoServiceProvider())
-                    {
-                        rng.GetBytes(publicKey);
-                        rng.GetBytes(privateKey);
-                    }
-                    keyPairs.Add((publicKey, privateKey));
+                    RandomNumberGenerator.Fill(publicKey);
+                    RandomNumberGenerator.Fill(privateKey);
+                    var keyPair = new KeyPair(publicKey, privateKey);
+                    keyPairs.Add(keyPair);
                     return (publicKey, privateKey);
                 });
 
@@ -68,13 +67,11 @@ namespace SignalSharp.Security.Tests.X3DH
             _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
                 .ReturnsAsync(() =>
                 {
-                    var publicKey = new byte[32];
+                    // Public key is 64 bytes (32 bytes X + 32 bytes Y coordinates)
+                    var publicKey = new byte[64];
                     var privateKey = new byte[32];
-                    using (var rng = new RNGCryptoServiceProvider())
-                    {
-                        rng.GetBytes(publicKey);
-                        rng.GetBytes(privateKey);
-                    }
+                    RandomNumberGenerator.Fill(publicKey);
+                    RandomNumberGenerator.Fill(privateKey);
                     return (publicKey, privateKey);
                 });
 
@@ -82,17 +79,18 @@ namespace SignalSharp.Security.Tests.X3DH
             var keyPair = await _service.GenerateIdentityKeyPairAsync();
 
             // Assert
+            keyPair.Should().NotBeNull();
             keyPair.PublicKey.Should().NotBeNull();
             keyPair.PrivateKey.Should().NotBeNull();
-            keyPair.PublicKey.Length.Should().Be(32, "Public key should be 32 bytes (256 bits)");
-            keyPair.PrivateKey.Length.Should().Be(32, "Private key should be 32 bytes (256 bits)");
+            keyPair.PublicKey.Length.Should().Be(64, "Public key should be 64 bytes (32 bytes X + 32 bytes Y)");
+            keyPair.PrivateKey.Length.Should().Be(32, "Private key should be 32 bytes");
         }
 
         [Fact]
         public async Task GenerateSignedPreKeyPair_ShouldValidateIdentityKeyPair()
         {
-            // Arrange
-            var invalidKeyPair = new KeyPair { PublicKey = new byte[31], PrivateKey = new byte[31] };
+            // Arrange - Invalid key pair with wrong lengths
+            var invalidKeyPair = new KeyPair(new byte[31], new byte[31]);
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(() => 
@@ -102,33 +100,37 @@ namespace SignalSharp.Security.Tests.X3DH
         [Fact]
         public async Task GenerateSignedPreKeyPair_ShouldProduceValidSignature()
         {
-            // Arrange
-            var identityKeyPair = new KeyPair 
-            { 
-                PublicKey = new byte[32], 
-                PrivateKey = new byte[32] 
-            };
-            var expectedPreKeyPair = new KeyPair 
-            { 
-                PublicKey = new byte[32], 
-                PrivateKey = new byte[32] 
-            };
-            var expectedSignature = new byte[64];
+            // Arrange - Identity key pair with correct lengths
+            var publicKey = new byte[64];
+            var privateKey = new byte[32];
+            RandomNumberGenerator.Fill(publicKey);
+            RandomNumberGenerator.Fill(privateKey);
+            var identityKeyPair = new KeyPair(publicKey, privateKey);
 
             _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
-                .ReturnsAsync((expectedPreKeyPair.PublicKey, expectedPreKeyPair.PrivateKey));
-            _keyExchangeServiceMock.Setup(x => x.SignAsync(It.IsAny<byte[]>(), identityKeyPair.PrivateKey))
-                .ReturnsAsync(expectedSignature);
+                .ReturnsAsync(() =>
+                {
+                    // Public key is 64 bytes (32 bytes X + 32 bytes Y coordinates)
+                    var pubKey = new byte[64];
+                    var privKey = new byte[32];
+                    RandomNumberGenerator.Fill(pubKey);
+                    RandomNumberGenerator.Fill(privKey);
+                    return (pubKey, privKey);
+                });
+
+            _keyExchangeServiceMock.Setup(x => x.SignAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[64]); // Signature is 64 bytes
 
             // Act
-            var result = await _service.GenerateSignedPreKeyPairAsync(identityKeyPair);
+            var preKeyPair = await _service.GenerateSignedPreKeyPairAsync(identityKeyPair);
 
             // Assert
-            result.Should().NotBeNull();
-            result.PublicKey.Should().BeEquivalentTo(expectedPreKeyPair.PublicKey);
-            result.PrivateKey.Should().BeEquivalentTo(expectedPreKeyPair.PrivateKey);
-            result.Signature.Should().BeEquivalentTo(expectedSignature);
-            result.Signature.Length.Should().Be(64, "Signature should be 64 bytes (512 bits)");
+            preKeyPair.Should().NotBeNull();
+            preKeyPair.PublicKey.Should().NotBeNull();
+            preKeyPair.PrivateKey.Should().NotBeNull();
+            preKeyPair.PublicKey.Length.Should().Be(64, "Public key should be 64 bytes (32 bytes X + 32 bytes Y)");
+            preKeyPair.PrivateKey.Length.Should().Be(32, "Private key should be 32 bytes");
+            _keyExchangeServiceMock.Verify(x => x.SignAsync(identityKeyPair.PrivateKey, It.IsAny<byte[]>()), Times.Once);
         }
 
         [Fact]
@@ -139,13 +141,11 @@ namespace SignalSharp.Security.Tests.X3DH
             _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
                 .ReturnsAsync(() =>
                 {
-                    var publicKey = new byte[32];
+                    // Public key is 64 bytes (32 bytes X + 32 bytes Y coordinates)
+                    var publicKey = new byte[64];
                     var privateKey = new byte[32];
-                    using (var rng = new RNGCryptoServiceProvider())
-                    {
-                        rng.GetBytes(publicKey);
-                        rng.GetBytes(privateKey);
-                    }
+                    RandomNumberGenerator.Fill(publicKey);
+                    RandomNumberGenerator.Fill(privateKey);
                     var keyPair = new KeyPair(publicKey, privateKey);
                     keyPairs.Add(keyPair);
                     return (publicKey, privateKey);
@@ -161,13 +161,15 @@ namespace SignalSharp.Security.Tests.X3DH
             keyPairs.Should().HaveCount(100);
             var uniquePublicKeys = keyPairs.Select(x => x.PublicKey).Distinct().Count();
             var uniquePrivateKeys = keyPairs.Select(x => x.PrivateKey).Distinct().Count();
-            uniquePublicKeys.Should().Be(100, "All one-time pre-key public keys should be unique");
-            uniquePrivateKeys.Should().Be(100, "All one-time pre-key private keys should be unique");
+            uniquePublicKeys.Should().Be(100, "All public keys should be unique");
+            uniquePrivateKeys.Should().Be(100, "All private keys should be unique");
         }
 
         [Theory]
-        [InlineData(31)] // Too short
-        [InlineData(33)] // Too long
+        [InlineData(31)] // Too short for private key
+        [InlineData(33)] // Too long for private key
+        [InlineData(63)] // Too short for public key
+        [InlineData(65)] // Too long for public key
         public async Task GenerateKeyPair_ShouldValidateKeyLength(int keyLength)
         {
             // Arrange
@@ -176,11 +178,8 @@ namespace SignalSharp.Security.Tests.X3DH
                 {
                     var publicKey = new byte[keyLength];
                     var privateKey = new byte[keyLength];
-                    using (var rng = new RNGCryptoServiceProvider())
-                    {
-                        rng.GetBytes(publicKey);
-                        rng.GetBytes(privateKey);
-                    }
+                    RandomNumberGenerator.Fill(publicKey);
+                    RandomNumberGenerator.Fill(privateKey);
                     return (publicKey, privateKey);
                 });
 

@@ -14,6 +14,9 @@ namespace SignalSharp.Security.Tests.CryptographicPrimitives
     /// </summary>
     public class CryptographicPrimitivesTests
     {
+        private const int ExpectedPrivateKeyLength = 32; // 256 bits for NIST P-256
+        private const int ExpectedPublicKeyLength = ExpectedPrivateKeyLength * 2; // X and Y coordinates
+
         [Fact]
         public async Task AesEncryption_ShouldUseSecureParameters()
         {
@@ -60,8 +63,8 @@ namespace SignalSharp.Security.Tests.CryptographicPrimitives
             // Assert
             publicKey.Should().NotBeNull();
             privateKey.Should().NotBeNull();
-            publicKey.Length.Should().Be(32);
-            privateKey.Length.Should().Be(32);
+            publicKey.Length.Should().Be(ExpectedPublicKeyLength); // 64 bytes for X and Y coordinates
+            privateKey.Length.Should().Be(ExpectedPrivateKeyLength); // 32 bytes for private key
         }
 
         [Fact]
@@ -80,7 +83,7 @@ namespace SignalSharp.Security.Tests.CryptographicPrimitives
             aliceSecret.Should().NotBeNull();
             bobSecret.Should().NotBeNull();
             aliceSecret.Should().BeEquivalentTo(bobSecret);
-            aliceSecret.Length.Should().Be(32);
+            aliceSecret.Length.Should().Be(ExpectedPrivateKeyLength);
         }
 
         [Fact]
@@ -179,7 +182,7 @@ namespace SignalSharp.Security.Tests.CryptographicPrimitives
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentException>(() => 
-                service.ComputeSharedSecretAsync(invalidKey, new byte[32]));
+                service.ComputeSharedSecretAsync(invalidKey, new byte[ExpectedPublicKeyLength]));
         }
     }
 } 

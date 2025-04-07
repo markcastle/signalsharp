@@ -54,6 +54,22 @@ namespace SignalSharp.Tests.Security
                 _encryptionServiceMock.Object,
                 _keyExchangeServiceMock.Object,
                 _hashServiceMock.Object);
+
+            _hashServiceMock.Setup(x => x.DeriveKeyAsync(
+                It.IsAny<byte[]>(),
+                It.IsAny<byte[]>(),
+                It.IsAny<int>(),
+                It.IsAny<byte[]>()))
+                .ReturnsAsync((byte[] input, byte[] salt, int length, byte[] info) => new byte[length]);
+
+            _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
+
+            _encryptionServiceMock.Setup(x => x.EncryptAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync((byte[] data, byte[] key) => data);
+
+            _encryptionServiceMock.Setup(x => x.DecryptAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync((byte[] data, byte[] key) => data);
         }
 
         /// <summary>
@@ -186,6 +202,10 @@ namespace SignalSharp.Tests.Security
                 .Setup(x => x.ComputeKeyedHashAsync(ciphertext, sendingChainKey))
                 .ReturnsAsync(mac);
 
+            _hashServiceMock
+                .Setup(x => x.VerifyKeyedHashAsync(ciphertext, messageKey, mac))
+                .ReturnsAsync(true);
+
             // Act
             (SignalMessage? result, SessionState? updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
 
@@ -258,6 +278,10 @@ namespace SignalSharp.Tests.Security
                     It.Is<byte[]>(p => System.Text.Encoding.UTF8.GetString(p) == "chain"),
                     32))
                 .ReturnsAsync(newChainKey);
+
+            _hashServiceMock
+                .Setup(x => x.ComputeKeyedHashAsync(ciphertext, messageKey))
+                .ReturnsAsync(mac);
 
             _hashServiceMock
                 .Setup(x => x.VerifyKeyedHashAsync(ciphertext, messageKey, mac))
@@ -344,6 +368,10 @@ namespace SignalSharp.Tests.Security
             _keyExchangeServiceMock
                 .Setup(x => x.DeriveSymmetricKeyAsync(sharedSecret, receivingRatchetKey))
                 .ReturnsAsync(newChainKey);
+
+            _hashServiceMock
+                .Setup(x => x.ComputeKeyedHashAsync(ciphertext, newChainKey))
+                .ReturnsAsync(mac);
 
             _hashServiceMock
                 .Setup(x => x.VerifyKeyedHashAsync(ciphertext, newChainKey, mac))

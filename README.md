@@ -39,13 +39,6 @@ SignalSharp is designed to be easy to integrate into existing applications while
 
 For now, you can use the library by referencing it directly from GitHub or by building it locally.
 
-## 🚫 Export Control Notice
-
-⚠️ **Export Control Notice**
-This software may be subject to UK and international export control laws. 
-It is not intended for use in countries embargoed or sanctioned by the UK, US, or EU. 
-By downloading or using this software, you agree that you are not located in, under the control of, or a national/resident of any such country.
-
 ## ✨ Features
 
 - 🔒 End-to-end encryption using modern cryptographic primitives
@@ -252,7 +245,6 @@ For more details and advanced usage, see the [SignalSharp.DependencyInjection do
 - Immutable key pairs and session states
 - Secure key derivation using HMAC-based key derivation
 - Automatic key rotation and ratcheting
-- Note: System.Text.Json package has known high severity vulnerabilities (GHSA-8g4q-xg66-9fp4, GHSA-hh2w-p6rv-4g7w) - currently monitored for official fix
 
 ## 🧪 Testing
 

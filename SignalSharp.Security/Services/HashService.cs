@@ -80,38 +80,50 @@ namespace SignalSharp.Security.Services
             return ByteArraysEqual(computedHash, hash);
         }
 
-        /// <summary>
-        /// Derives a key from the specified input using HKDF (HMAC-based Key Derivation Function).
-        /// </summary>
-        /// <param name="input">The input data to derive the key from.</param>
-        /// <param name="salt">The salt to use in the key derivation.</param>
-        /// <param name="outputLength">The desired length of the derived key in bytes.</param>
-        /// <returns>The derived key.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when input or salt is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when outputLength is less than 1.</exception>
+        /// <inheritdoc/>
         public async Task<byte[]> DeriveKeyAsync(byte[] input, byte[] salt, int outputLength)
+        {
+            return await DeriveKeyAsync(input, salt, outputLength, new byte[] { 0x01 });
+        }
+
+        /// <inheritdoc/>
+        public async Task<byte[]> DeriveKeyAsync(byte[] input, byte[] salt, int outputLength, byte[] info)
         {
             if (input == null) throw new ArgumentNullException(nameof(input));
             if (salt == null) throw new ArgumentNullException(nameof(salt));
-            if (outputLength < 1) throw new ArgumentException("Output length must be at least 1 byte", nameof(outputLength));
+            if (info == null) throw new ArgumentNullException(nameof(info));
+            if (outputLength <= 0) throw new ArgumentException("Output length must be positive", nameof(outputLength));
 
             return await Task.Run(() =>
             {
+                // Extract phase: PRK = HMAC-Hash(salt, IKM)
                 using var hmac = new HMACSHA256(salt);
                 var prk = hmac.ComputeHash(input);
-                var result = new byte[outputLength];
-                var block = new byte[0];
-                var offset = 0;
 
-                while (offset < outputLength)
+                // Expand phase
+                var n = (outputLength + 31) / 32; // Number of iterations needed (ceiling division by 32)
+                var t = new byte[n * 32]; // Temporary buffer for all blocks
+                var okm = new byte[outputLength]; // Output keying material
+
+                using var expandHmac = new HMACSHA256(prk);
+                var lastBlock = new byte[0];
+
+                // Generate blocks
+                for (var i = 0; i < n; i++)
                 {
-                    var blockSize = Math.Min(32, outputLength - offset);
-                    block = hmac.ComputeHash(block.Length == 0 ? prk : Concat(block, prk));
-                    Buffer.BlockCopy(block, 0, result, offset, blockSize);
-                    offset += blockSize;
+                    // T(i) = HMAC-Hash(PRK, T(i-1) | info | i+1)
+                    var blockInput = new byte[lastBlock.Length + info.Length + 1];
+                    Buffer.BlockCopy(lastBlock, 0, blockInput, 0, lastBlock.Length);
+                    Buffer.BlockCopy(info, 0, blockInput, lastBlock.Length, info.Length);
+                    blockInput[blockInput.Length - 1] = (byte)(i + 1);
+
+                    lastBlock = expandHmac.ComputeHash(blockInput);
+                    Buffer.BlockCopy(lastBlock, 0, t, i * 32, 32);
                 }
 
-                return result;
+                // Copy the required number of bytes to the output
+                Buffer.BlockCopy(t, 0, okm, 0, outputLength);
+                return okm;
             });
         }
 

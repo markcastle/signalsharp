@@ -95,7 +95,11 @@ public class X3DhKeyAgreementServiceTests
     public async Task GenerateIdentityKeyPair_ReturnsValidKeyPair()
     {
         // Arrange
-        (byte[]? publicKey, byte[]? privateKey) = (new byte[] { 1, 2, 3 }, new byte[] { 4, 5, 6 });
+        var publicKey = new byte[64]; // 64-byte public key
+        var privateKey = new byte[32]; // 32-byte private key
+        for (int i = 0; i < publicKey.Length; i++) publicKey[i] = (byte)i;
+        for (int i = 0; i < privateKey.Length; i++) privateKey[i] = (byte)(i + 100);
+
         _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
             .ReturnsAsync((publicKey, privateKey));
 
@@ -125,9 +129,19 @@ public class X3DhKeyAgreementServiceTests
     public async Task GenerateSignedPreKeyPair_WithValidIdentityKeyPair_ReturnsValidKeyPair()
     {
         // Arrange
-        KeyPair identityKeyPair = new(new byte[] { 1, 2, 3 }, new byte[] { 4, 5, 6 });
-        (byte[]? publicKey, byte[]? privateKey) = (new byte[] { 7, 8, 9 }, new byte[] { 10, 11, 12 });
-        byte[] signature = { 13, 14, 15 };
+        var identityPublicKey = new byte[64];
+        var identityPrivateKey = new byte[32];
+        var publicKey = new byte[64];
+        var privateKey = new byte[32];
+        var signature = new byte[64]; // Typical ECDSA signature length
+
+        for (int i = 0; i < identityPublicKey.Length; i++) identityPublicKey[i] = (byte)i;
+        for (int i = 0; i < identityPrivateKey.Length; i++) identityPrivateKey[i] = (byte)(i + 100);
+        for (int i = 0; i < publicKey.Length; i++) publicKey[i] = (byte)(i + 150);
+        for (int i = 0; i < privateKey.Length; i++) privateKey[i] = (byte)(i + 200);
+        for (int i = 0; i < signature.Length; i++) signature[i] = (byte)(i + 250);
+
+        KeyPair identityKeyPair = new(identityPublicKey, identityPrivateKey);
 
         _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
             .ReturnsAsync((publicKey, privateKey));
@@ -161,7 +175,11 @@ public class X3DhKeyAgreementServiceTests
     public async Task GenerateOneTimePreKeyPair_ReturnsValidKeyPair()
     {
         // Arrange
-        (byte[]? publicKey, byte[]? privateKey) = (new byte[] { 1, 2, 3 }, new byte[] { 4, 5, 6 });
+        var publicKey = new byte[64];
+        var privateKey = new byte[32];
+        for (int i = 0; i < publicKey.Length; i++) publicKey[i] = (byte)i;
+        for (int i = 0; i < privateKey.Length; i++) privateKey[i] = (byte)(i + 100);
+
         _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
             .ReturnsAsync((publicKey, privateKey));
 
@@ -190,12 +208,17 @@ public class X3DhKeyAgreementServiceTests
     public async Task PerformKeyAgreement_WithNullParameters_ThrowsInvalidOperationException()
     {
         // Arrange
-        byte[] initiatorIdentityKey = { 1, 2, 3 };
-        byte[] initiatorEphemeralKey = { 4, 5, 6 };
-        byte[] recipientIdentityKey = { 7, 8, 9 };
-        byte[] recipientSignedPreKey = { 10, 11, 12 };
-        // ReSharper disable once UnusedVariable
-        byte[] recipientOneTimePreKey = { 13, 14, 15 };
+        var initiatorIdentityKey = new byte[32];
+        var initiatorEphemeralKey = new byte[32];
+        var recipientIdentityKey = new byte[64];
+        var recipientSignedPreKey = new byte[64];
+        var recipientOneTimePreKey = new byte[64];
+
+        for (int i = 0; i < initiatorIdentityKey.Length; i++) initiatorIdentityKey[i] = (byte)i;
+        for (int i = 0; i < initiatorEphemeralKey.Length; i++) initiatorEphemeralKey[i] = (byte)(i + 50);
+        for (int i = 0; i < recipientIdentityKey.Length; i++) recipientIdentityKey[i] = (byte)(i + 100);
+        for (int i = 0; i < recipientSignedPreKey.Length; i++) recipientSignedPreKey[i] = (byte)(i + 150);
+        for (int i = 0; i < recipientOneTimePreKey.Length; i++) recipientOneTimePreKey[i] = (byte)(i + 200);
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -232,17 +255,32 @@ public class X3DhKeyAgreementServiceTests
     public async Task PerformKeyAgreement_ReturnsValidSharedSecret()
     {
         // Arrange
-        byte[] initiatorIdentityKey = { 1, 2, 3 };
-        byte[] initiatorEphemeralKey = { 4, 5, 6 };
-        byte[] recipientIdentityKey = { 7, 8, 9 };
-        byte[] recipientSignedPreKey = { 10, 11, 12 };
-        byte[] recipientOneTimePreKey = { 13, 14, 15 };
+        var initiatorIdentityKey = new byte[32];
+        var initiatorEphemeralKey = new byte[32];
+        var recipientIdentityKey = new byte[64];
+        var recipientSignedPreKey = new byte[64];
+        var recipientOneTimePreKey = new byte[64];
 
-        byte[] dh1 = { 16, 17, 18 };
-        byte[] dh2 = { 19, 20, 21 };
-        byte[] dh3 = { 22, 23, 24 };
-        byte[] dh4 = { 25, 26, 27 };
-        byte[] expectedSecret = { 28, 29, 30 };
+        for (int i = 0; i < initiatorIdentityKey.Length; i++) initiatorIdentityKey[i] = (byte)i;
+        for (int i = 0; i < initiatorEphemeralKey.Length; i++) initiatorEphemeralKey[i] = (byte)(i + 50);
+        for (int i = 0; i < recipientIdentityKey.Length; i++) recipientIdentityKey[i] = (byte)(i + 100);
+        for (int i = 0; i < recipientSignedPreKey.Length; i++) recipientSignedPreKey[i] = (byte)(i + 150);
+        for (int i = 0; i < recipientOneTimePreKey.Length; i++) recipientOneTimePreKey[i] = (byte)(i + 200);
+
+        var dh1 = new byte[32];
+        var dh2 = new byte[32];
+        var dh3 = new byte[32];
+        var dh4 = new byte[32];
+        var expectedSecret = new byte[32];
+
+        for (int i = 0; i < 32; i++)
+        {
+            dh1[i] = (byte)(i + 1);
+            dh2[i] = (byte)(i + 2);
+            dh3[i] = (byte)(i + 3);
+            dh4[i] = (byte)(i + 4);
+            expectedSecret[i] = (byte)(i + 5);
+        }
 
         _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(initiatorIdentityKey, recipientSignedPreKey))
             .ReturnsAsync(dh1);
@@ -252,9 +290,18 @@ public class X3DhKeyAgreementServiceTests
             .ReturnsAsync(dh3);
         _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientOneTimePreKey))
             .ReturnsAsync(dh4);
-        _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(
-                It.Is<byte[]>(arr => arr.Length == dh1.Length + dh2.Length + dh3.Length + dh4.Length),
-                initiatorIdentityKey))
+
+        var combinedDh = new byte[dh1.Length + dh2.Length + dh3.Length + dh4.Length];
+        Buffer.BlockCopy(dh1, 0, combinedDh, 0, dh1.Length);
+        Buffer.BlockCopy(dh2, 0, combinedDh, dh1.Length, dh2.Length);
+        Buffer.BlockCopy(dh3, 0, combinedDh, dh1.Length + dh2.Length, dh3.Length);
+        Buffer.BlockCopy(dh4, 0, combinedDh, dh1.Length + dh2.Length + dh3.Length, dh4.Length);
+
+        _hashServiceMock.Setup(x => x.DeriveKeyAsync(
+            It.Is<byte[]>(b => b.Length == dh1.Length + dh2.Length + dh3.Length + dh4.Length),
+            It.Is<byte[]>(b => b.Length == 32), // Zero salt
+            It.Is<int>(l => l == 32),
+            It.Is<byte[]>(i => i.Length == 1))) // Info parameter
             .ReturnsAsync(expectedSecret);
 
         // Act
@@ -271,8 +318,10 @@ public class X3DhKeyAgreementServiceTests
         _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientIdentityKey), Times.Once);
         _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientSignedPreKey), Times.Once);
         _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(initiatorEphemeralKey, recipientOneTimePreKey), Times.Once);
-        _hashServiceMock.Verify(x => x.ComputeKeyedHashAsync(
-            It.Is<byte[]>(arr => arr.Length == dh1.Length + dh2.Length + dh3.Length + dh4.Length),
-            initiatorIdentityKey), Times.Once);
+        _hashServiceMock.Verify(x => x.DeriveKeyAsync(
+            It.Is<byte[]>(b => b.Length == dh1.Length + dh2.Length + dh3.Length + dh4.Length),
+            It.Is<byte[]>(b => b.Length == 32), // Zero salt
+            It.Is<int>(l => l == 32),
+            It.Is<byte[]>(i => i.Length == 1)), Times.Once); // Info parameter
     }
 }

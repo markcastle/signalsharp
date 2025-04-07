@@ -10,8 +10,7 @@ using Xunit;
 namespace SignalSharp.Security.Tests.X3DH
 {
     /// <summary>
-    /// Security-focused test suite for X3DH key agreement protocol.
-    /// These tests verify the cryptographic properties and security requirements of the key agreement process.
+    /// Test suite for the X3DHKeyAgreementService which implements the Extended Triple Diffie-Hellman (X3DH) key agreement protocol.
     /// </summary>
     public class X3DHKeyAgreementTests
     {
@@ -27,176 +26,331 @@ namespace SignalSharp.Security.Tests.X3DH
         }
 
         [Fact]
-        public async Task PerformKeyAgreement_ShouldFollowX3DHSpecification()
+        public async Task GenerateIdentityKeyPair_ReturnsValidKeyPair()
         {
             // Arrange
-            var identityKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var signedPreKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32], Signature = new byte[64] };
-            var oneTimePreKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var remoteIdentityKey = new byte[32];
-            var remoteSignedPreKey = new byte[32];
-            var remoteOneTimePreKey = new byte[32];
+            var publicKeyX = new byte[32];
+            var publicKeyY = new byte[32];
+            var privateKey = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                publicKeyX[i] = (byte)i;
+                publicKeyY[i] = (byte)(i + 32);
+                privateKey[i] = (byte)(i + 64);
+            }
+            var publicKey = publicKeyX.Concat(publicKeyY).ToArray();
 
-            // Setup mock to return different values for each DH exchange
-            var dh1 = new byte[32];
-            var dh2 = new byte[32];
-            var dh3 = new byte[32];
-            var dh4 = new byte[32];
-            var expectedSharedSecret = new byte[32];
-
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteSignedPreKey))
-                .ReturnsAsync(dh1);
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteIdentityKey))
-                .ReturnsAsync(dh2);
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteSignedPreKey))
-                .ReturnsAsync(dh3);
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteOneTimePreKey))
-                .ReturnsAsync(dh4);
-
-            _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(
-                It.Is<byte[]>(arr => arr.Length == dh1.Length + dh2.Length + dh3.Length + dh4.Length),
-                identityKeyPair.PrivateKey))
-                .ReturnsAsync(expectedSharedSecret);
+            _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
+                .ReturnsAsync((publicKey, privateKey));
 
             // Act
-            var result = await _service.PerformKeyAgreementAsync(
-                identityKeyPair,
-                signedPreKeyPair,
-                oneTimePreKeyPair,
-                remoteIdentityKey,
-                remoteSignedPreKey,
-                remoteOneTimePreKey);
+            var result = await _service.GenerateIdentityKeyPairAsync();
 
             // Assert
             result.Should().NotBeNull();
-            result.Should().BeEquivalentTo(expectedSharedSecret);
-            result.Length.Should().Be(32, "Shared secret should be 32 bytes (256 bits)");
+            result.PublicKey.Should().BeEquivalentTo(publicKey);
+            result.PrivateKey.Should().BeEquivalentTo(privateKey);
+            result.PublicKey.Length.Should().Be(64);
+            result.PrivateKey.Length.Should().Be(32);
+        }
 
-            // Verify all required DH exchanges were performed in the correct order
-            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(
-                identityKeyPair.PrivateKey, remoteSignedPreKey), Times.Once);
-            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(
-                identityKeyPair.PrivateKey, remoteIdentityKey), Times.Once);
-            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(
-                identityKeyPair.PrivateKey, remoteSignedPreKey), Times.Once);
-            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(
-                identityKeyPair.PrivateKey, remoteOneTimePreKey), Times.Once);
+        [Fact]
+        public async Task GenerateSignedPreKeyPair_WithValidIdentityKeyPair_ReturnsValidKeyPair()
+        {
+            // Arrange
+            var identityPublicKeyX = new byte[32];
+            var identityPublicKeyY = new byte[32];
+            var identityPrivateKey = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                identityPublicKeyX[i] = (byte)i;
+                identityPublicKeyY[i] = (byte)(i + 32);
+                identityPrivateKey[i] = (byte)(i + 64);
+            }
+            var identityPublicKey = identityPublicKeyX.Concat(identityPublicKeyY).ToArray();
+            var identityKeyPair = new KeyPair(identityPublicKey, identityPrivateKey);
+
+            var publicKeyX = new byte[32];
+            var publicKeyY = new byte[32];
+            var privateKey = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                publicKeyX[i] = (byte)(i + 96);
+                publicKeyY[i] = (byte)(i + 128);
+                privateKey[i] = (byte)(i + 160);
+            }
+            var publicKey = publicKeyX.Concat(publicKeyY).ToArray();
+            var signature = new byte[64];
+            for (int i = 0; i < 64; i++)
+            {
+                signature[i] = (byte)(i + 192);
+            }
+
+            _keyExchangeServiceMock.Setup(x => x.GenerateKeyPairAsync())
+                .ReturnsAsync((publicKey, privateKey));
+            _keyExchangeServiceMock.Setup(x => x.SignAsync(identityKeyPair.PrivateKey, publicKey))
+                .ReturnsAsync(signature);
+
+            // Act
+            var result = await _service.GenerateSignedPreKeyPairAsync(identityKeyPair);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.PublicKey.Should().BeEquivalentTo(publicKey);
+            result.PrivateKey.Should().BeEquivalentTo(privateKey);
+            result.PublicKey.Length.Should().Be(64);
+            result.PrivateKey.Length.Should().Be(32);
+        }
+
+        [Fact]
+        public async Task PerformKeyAgreement_ShouldFollowX3DHSpecification()
+        {
+            // Arrange
+            var aliceIdentityPrivateKey = new byte[32];
+            var aliceIdentityPublicKeyX = new byte[32];
+            var aliceIdentityPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                aliceIdentityPrivateKey[i] = (byte)i;
+                aliceIdentityPublicKeyX[i] = (byte)(i + 32);
+                aliceIdentityPublicKeyY[i] = (byte)(i + 64);
+            }
+            var aliceIdentityPublicKey = aliceIdentityPublicKeyX.Concat(aliceIdentityPublicKeyY).ToArray();
+
+            var aliceEphemeralPrivateKey = new byte[32];
+            var aliceEphemeralPublicKeyX = new byte[32];
+            var aliceEphemeralPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                aliceEphemeralPrivateKey[i] = (byte)(i + 96);
+                aliceEphemeralPublicKeyX[i] = (byte)(i + 128);
+                aliceEphemeralPublicKeyY[i] = (byte)(i + 160);
+            }
+            var aliceEphemeralPublicKey = aliceEphemeralPublicKeyX.Concat(aliceEphemeralPublicKeyY).ToArray();
+
+            var bobIdentityPrivateKey = new byte[32];
+            var bobIdentityPublicKeyX = new byte[32];
+            var bobIdentityPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                bobIdentityPrivateKey[i] = (byte)(i + 192);
+                bobIdentityPublicKeyX[i] = (byte)(i + 224);
+                bobIdentityPublicKeyY[i] = (byte)(i + 256);
+            }
+            var bobIdentityPublicKey = bobIdentityPublicKeyX.Concat(bobIdentityPublicKeyY).ToArray();
+
+            var bobSignedPreKeyPrivateKey = new byte[32];
+            var bobSignedPreKeyPublicKeyX = new byte[32];
+            var bobSignedPreKeyPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                bobSignedPreKeyPrivateKey[i] = (byte)(i + 288);
+                bobSignedPreKeyPublicKeyX[i] = (byte)(i + 320);
+                bobSignedPreKeyPublicKeyY[i] = (byte)(i + 352);
+            }
+            var bobSignedPreKeyPublicKey = bobSignedPreKeyPublicKeyX.Concat(bobSignedPreKeyPublicKeyY).ToArray();
+
+            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
+
+            _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
+
+            _hashServiceMock.Setup(x => x.DeriveKeyAsync(
+                It.IsAny<byte[]>(),
+                It.IsAny<byte[]>(),
+                It.Is<int>(l => l == 32),
+                It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
+
+            // Act
+            var sharedSecret = await _service.PerformKeyAgreementAsync(
+                aliceIdentityPrivateKey,
+                aliceEphemeralPrivateKey,
+                bobIdentityPublicKey,
+                bobSignedPreKeyPublicKey,
+                null);
+
+            // Assert
+            sharedSecret.Should().NotBeNull();
+            sharedSecret.Length.Should().Be(32, "Shared secret should be 32 bytes (256 bits)");
+            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()), Times.Exactly(3));
         }
 
         [Fact]
         public async Task PerformKeyAgreement_ShouldHandleMissingOneTimePreKey()
         {
             // Arrange
-            var identityKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var signedPreKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32], Signature = new byte[64] };
-            var oneTimePreKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var remoteIdentityKey = new byte[32];
-            var remoteSignedPreKey = new byte[32];
+            var aliceIdentityPrivateKey = new byte[32];
+            var aliceIdentityPublicKeyX = new byte[32];
+            var aliceIdentityPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                aliceIdentityPrivateKey[i] = (byte)i;
+                aliceIdentityPublicKeyX[i] = (byte)(i + 32);
+                aliceIdentityPublicKeyY[i] = (byte)(i + 64);
+            }
+            var aliceIdentityPublicKey = aliceIdentityPublicKeyX.Concat(aliceIdentityPublicKeyY).ToArray();
 
-            // Setup mock to return different values for each DH exchange
-            var dh1 = new byte[32];
-            var dh2 = new byte[32];
-            var dh3 = new byte[32];
-            var expectedSharedSecret = new byte[32];
+            var aliceEphemeralPrivateKey = new byte[32];
+            var aliceEphemeralPublicKeyX = new byte[32];
+            var aliceEphemeralPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                aliceEphemeralPrivateKey[i] = (byte)(i + 96);
+                aliceEphemeralPublicKeyX[i] = (byte)(i + 128);
+                aliceEphemeralPublicKeyY[i] = (byte)(i + 160);
+            }
+            var aliceEphemeralPublicKey = aliceEphemeralPublicKeyX.Concat(aliceEphemeralPublicKeyY).ToArray();
 
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteSignedPreKey))
-                .ReturnsAsync(dh1);
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteIdentityKey))
-                .ReturnsAsync(dh2);
-            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(identityKeyPair.PrivateKey, remoteSignedPreKey))
-                .ReturnsAsync(dh3);
+            var bobIdentityPrivateKey = new byte[32];
+            var bobIdentityPublicKeyX = new byte[32];
+            var bobIdentityPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                bobIdentityPrivateKey[i] = (byte)(i + 192);
+                bobIdentityPublicKeyX[i] = (byte)(i + 224);
+                bobIdentityPublicKeyY[i] = (byte)(i + 256);
+            }
+            var bobIdentityPublicKey = bobIdentityPublicKeyX.Concat(bobIdentityPublicKeyY).ToArray();
 
-            _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(
-                It.Is<byte[]>(arr => arr.Length == dh1.Length + dh2.Length + dh3.Length),
-                identityKeyPair.PrivateKey))
-                .ReturnsAsync(expectedSharedSecret);
+            var bobSignedPreKeyPrivateKey = new byte[32];
+            var bobSignedPreKeyPublicKeyX = new byte[32];
+            var bobSignedPreKeyPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                bobSignedPreKeyPrivateKey[i] = (byte)(i + 288);
+                bobSignedPreKeyPublicKeyX[i] = (byte)(i + 320);
+                bobSignedPreKeyPublicKeyY[i] = (byte)(i + 352);
+            }
+            var bobSignedPreKeyPublicKey = bobSignedPreKeyPublicKeyX.Concat(bobSignedPreKeyPublicKeyY).ToArray();
+
+            _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
+
+            _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
+
+            _hashServiceMock.Setup(x => x.DeriveKeyAsync(
+                It.IsAny<byte[]>(),
+                It.IsAny<byte[]>(),
+                It.Is<int>(l => l == 32),
+                It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
 
             // Act
-            var result = await _service.PerformKeyAgreementAsync(
-                identityKeyPair,
-                signedPreKeyPair,
-                oneTimePreKeyPair,
-                remoteIdentityKey,
-                remoteSignedPreKey,
+            var sharedSecret = await _service.PerformKeyAgreementAsync(
+                aliceIdentityPrivateKey,
+                aliceEphemeralPrivateKey,
+                bobIdentityPublicKey,
+                bobSignedPreKeyPublicKey,
                 null);
 
             // Assert
-            result.Should().NotBeNull();
-            result.Should().BeEquivalentTo(expectedSharedSecret);
-            result.Length.Should().Be(32, "Shared secret should be 32 bytes (256 bits)");
-
-            // Verify only required DH exchanges were performed (3 instead of 4)
-            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(
-                It.IsAny<byte[]>(), It.IsAny<byte[]>()), Times.Exactly(3));
+            sharedSecret.Should().NotBeNull();
+            sharedSecret.Length.Should().Be(32, "Shared secret should be 32 bytes (256 bits)");
+            _keyExchangeServiceMock.Verify(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()), Times.Exactly(3));
         }
 
-        [Theory]
-        [InlineData(null)]
-        [InlineData(new byte[0])]
-        [InlineData(new byte[31])] // Too short
-        [InlineData(new byte[33])] // Too long
-        public async Task PerformKeyAgreement_ShouldValidateKeyLengths(byte[] invalidKey)
+        [Fact]
+        public async Task PerformKeyAgreement_ShouldValidateKeyLengths()
         {
             // Arrange
-            var identityKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var signedPreKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32], Signature = new byte[64] };
-            var oneTimePreKeyPair = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
+            var invalidPrivateKey = new byte[31];
+            var invalidPublicKeyX = new byte[31];
+            var invalidPublicKeyY = new byte[31];
+            var invalidPublicKey = invalidPublicKeyX.Concat(invalidPublicKeyY).ToArray();
 
             // Act & Assert
-            await Assert.ThrowsAsync<ArgumentException>(() => _service.PerformKeyAgreementAsync(
-                identityKeyPair,
-                signedPreKeyPair,
-                oneTimePreKeyPair,
-                invalidKey,
-                new byte[32],
-                new byte[32]));
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.PerformKeyAgreementAsync(
+                    invalidPrivateKey,
+                    invalidPrivateKey,
+                    invalidPublicKey,
+                    invalidPublicKey,
+                    null));
         }
 
         [Fact]
         public async Task PerformKeyAgreement_ShouldProduceSameSecretForBothParties()
         {
             // Arrange
-            var aliceIdentityKey = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var aliceSignedPreKey = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32], Signature = new byte[64] };
-            var aliceOneTimePreKey = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var bobIdentityKey = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
-            var bobSignedPreKey = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32], Signature = new byte[64] };
-            var bobOneTimePreKey = new KeyPair { PublicKey = new byte[32], PrivateKey = new byte[32] };
+            var aliceIdentityPrivateKey = new byte[32];
+            var aliceIdentityPublicKeyX = new byte[32];
+            var aliceIdentityPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                aliceIdentityPrivateKey[i] = (byte)i;
+                aliceIdentityPublicKeyX[i] = (byte)(i + 32);
+                aliceIdentityPublicKeyY[i] = (byte)(i + 64);
+            }
+            var aliceIdentityPublicKey = aliceIdentityPublicKeyX.Concat(aliceIdentityPublicKeyY).ToArray();
 
-            // Setup mock to return consistent values for each DH exchange
-            var dh1 = new byte[32];
-            var dh2 = new byte[32];
-            var dh3 = new byte[32];
-            var dh4 = new byte[32];
-            var expectedSharedSecret = new byte[32];
+            var aliceEphemeralPrivateKey = new byte[32];
+            var aliceEphemeralPublicKeyX = new byte[32];
+            var aliceEphemeralPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                aliceEphemeralPrivateKey[i] = (byte)(i + 96);
+                aliceEphemeralPublicKeyX[i] = (byte)(i + 128);
+                aliceEphemeralPublicKeyY[i] = (byte)(i + 160);
+            }
+            var aliceEphemeralPublicKey = aliceEphemeralPublicKeyX.Concat(aliceEphemeralPublicKeyY).ToArray();
+
+            var bobIdentityPrivateKey = new byte[32];
+            var bobIdentityPublicKeyX = new byte[32];
+            var bobIdentityPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                bobIdentityPrivateKey[i] = (byte)(i + 192);
+                bobIdentityPublicKeyX[i] = (byte)(i + 224);
+                bobIdentityPublicKeyY[i] = (byte)(i + 256);
+            }
+            var bobIdentityPublicKey = bobIdentityPublicKeyX.Concat(bobIdentityPublicKeyY).ToArray();
+
+            var bobSignedPreKeyPrivateKey = new byte[32];
+            var bobSignedPreKeyPublicKeyX = new byte[32];
+            var bobSignedPreKeyPublicKeyY = new byte[32];
+            for (int i = 0; i < 32; i++)
+            {
+                bobSignedPreKeyPrivateKey[i] = (byte)(i + 288);
+                bobSignedPreKeyPublicKeyX[i] = (byte)(i + 320);
+                bobSignedPreKeyPublicKeyY[i] = (byte)(i + 352);
+            }
+            var bobSignedPreKeyPublicKey = bobSignedPreKeyPublicKeyX.Concat(bobSignedPreKeyPublicKeyY).ToArray();
 
             _keyExchangeServiceMock.Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
-                .ReturnsAsync(dh1);
+                .ReturnsAsync(new byte[32]);
+
             _hashServiceMock.Setup(x => x.ComputeKeyedHashAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
-                .ReturnsAsync(expectedSharedSecret);
+                .ReturnsAsync(new byte[32]);
+
+            _hashServiceMock.Setup(x => x.DeriveKeyAsync(
+                It.IsAny<byte[]>(),
+                It.IsAny<byte[]>(),
+                It.Is<int>(l => l == 32),
+                It.IsAny<byte[]>()))
+                .ReturnsAsync(new byte[32]);
 
             // Act
-            var aliceSecret = await _service.PerformKeyAgreementAsync(
-                aliceIdentityKey,
-                aliceSignedPreKey,
-                aliceOneTimePreKey,
-                bobIdentityKey.PublicKey,
-                bobSignedPreKey.PublicKey,
-                bobOneTimePreKey.PublicKey);
+            var aliceSharedSecret = await _service.PerformKeyAgreementAsync(
+                aliceIdentityPrivateKey,
+                aliceEphemeralPrivateKey,
+                bobIdentityPublicKey,
+                bobSignedPreKeyPublicKey,
+                null);
 
-            var bobSecret = await _service.PerformKeyAgreementAsync(
-                bobIdentityKey,
-                bobSignedPreKey,
-                bobOneTimePreKey,
-                aliceIdentityKey.PublicKey,
-                aliceSignedPreKey.PublicKey,
-                aliceOneTimePreKey.PublicKey);
+            var bobSharedSecret = await _service.PerformKeyAgreementAsync(
+                bobIdentityPrivateKey,
+                bobSignedPreKeyPrivateKey,
+                aliceIdentityPublicKey,
+                aliceEphemeralPublicKey,
+                null);
 
             // Assert
-            aliceSecret.Should().NotBeNull();
-            bobSecret.Should().NotBeNull();
-            aliceSecret.Should().BeEquivalentTo(bobSecret, "Both parties should derive the same shared secret");
-            aliceSecret.Length.Should().Be(32, "Shared secret should be 32 bytes (256 bits)");
+            aliceSharedSecret.Should().NotBeNull();
+            bobSharedSecret.Should().NotBeNull();
+            aliceSharedSecret.Should().BeEquivalentTo(bobSharedSecret, "Both parties should derive the same shared secret");
         }
     }
 } 
