@@ -139,6 +139,70 @@ public class CustomKeyStore : IKeyStore
 }
 ```
 
+#### Dependency Injection Support
+
+SignalSharp provides full dependency injection support through the `SignalSharp.DependencyInjection` package, making it easy to integrate into applications using Microsoft's dependency injection framework.
+
+```csharp
+// Add SignalSharp services to your application
+services.AddSignalSharp(options =>
+{
+    // Configure key store
+    options.KeyStoreOptions.Type = KeyStoreType.File;
+    options.KeyStoreOptions.Path = "path/to/keys";
+
+    // Configure JSON serializer
+    options.JsonSerializerOptions.Type = JsonSerializerType.SystemTextJson;
+
+    // Configure session manager
+    options.SessionManagerOptions.Type = SessionManagerType.File;
+    options.SessionManagerOptions.Path = "path/to/sessions";
+});
+
+// Use the SignalSharpFactory for common operations
+public class SignalService
+{
+    private readonly SignalSharpFactory _signalFactory;
+
+    public SignalService(SignalSharpFactory signalFactory)
+    {
+        _signalFactory = signalFactory;
+    }
+
+    public async Task<string> CreateSessionAsync(byte[] remoteIdentityKey, byte[] remotePreKey)
+    {
+        var identityKeyPair = await _signalFactory.CreateIdentityKeyPairAsync();
+        var signedPreKeyPair = await _signalFactory.CreateSignedPreKeyPairAsync(identityKeyPair);
+        
+        return await _signalFactory.CreateSessionAsync(
+            remoteIdentityKey,
+            remotePreKey,
+            null, // one-time prekey (optional)
+            identityKeyPair,
+            signedPreKeyPair);
+    }
+
+    public async Task<byte[]> EncryptMessageAsync(string sessionId, string message)
+    {
+        return await _signalFactory.EncryptMessageAsync(sessionId, message);
+    }
+
+    public async Task<string> DecryptMessageAsync(string sessionId, byte[] encryptedMessage)
+    {
+        return await _signalFactory.DecryptMessageAsync(sessionId, encryptedMessage);
+    }
+}
+```
+
+The DI package provides:
+- Easy configuration through options pattern
+- Factory methods for common operations
+- Support for custom implementations
+- Integration with ASP.NET Core and other DI-enabled applications
+- Automatic service registration and lifetime management
+
+For more details and advanced usage, see the [SignalSharp.DependencyInjection documentation](SignalSharp.DependencyInjection/README.md).
+
 ## 🔒 Security Considerations
 
 - All cryptographic operations use secure random number generation
