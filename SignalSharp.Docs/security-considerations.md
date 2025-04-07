@@ -87,6 +87,46 @@ This document outlines important security considerations when using SignalSharp.
 - Implement alerts for security-related events.
 - Consider using a security information and event management (SIEM) system.
 
+## Message Authentication Code (MAC) Computation
+
+### Recent Security Enhancements
+
+The MAC computation process has been enhanced with several security improvements:
+
+1. **Buffer Overflow Protection**
+   - Fixed potential buffer overflow issues in MAC computation
+   - Implemented proper buffer size calculations
+   - Added null checks for chain keys
+   - Ensured consistent buffer handling across encryption and decryption
+
+2. **Key Length Validation**
+   - Added strict validation for key lengths
+   - Ensured all cryptographic keys meet minimum length requirements
+   - Implemented proper key size checks before MAC computation
+   - Added validation for chain key lengths
+
+3. **MAC Verification Process**
+   - Enhanced MAC verification with proper key handling
+   - Improved error handling for failed verifications
+   - Added additional context to MAC computation
+   - Implemented constant-time comparison for MAC verification
+
+4. **Security Testing**
+   - Added comprehensive test coverage for MAC operations
+   - Implemented edge case testing for buffer handling
+   - Added tests for key length validation
+   - Included tests for MAC verification failures
+
+### Best Practices
+
+When working with MAC computation in SignalSharp:
+
+1. Always use the provided MAC computation methods
+2. Never modify the MAC computation process
+3. Ensure proper key management
+4. Handle verification failures appropriately
+5. Keep cryptographic keys secure
+
 ## Code Examples
 
 ### Secure Key Generation

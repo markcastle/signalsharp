@@ -463,4 +463,72 @@ public class DecryptedMessage
     /// Gets or sets a value indicating whether the message was skipped.
     /// </summary>
     public bool WasSkipped { get; set; }
-} 
+}
+
+## DoubleRatchetService
+
+### EncryptMessageAsync
+
+```csharp
+public async Task<(SignalMessage Message, SessionState UpdatedState)> EncryptMessageAsync(
+    SessionState sessionState,
+    byte[] message)
+```
+
+Encrypts a message using the Double Ratchet protocol with enhanced security features:
+
+- Proper buffer handling for MAC computation
+- Key length validation
+- Secure chain key management
+- Message authentication with MAC verification
+
+#### Parameters
+
+- `sessionState`: The current session state containing cryptographic keys
+- `message`: The message to encrypt
+
+#### Returns
+
+- A tuple containing:
+  - `Message`: The encrypted message with MAC
+  - `UpdatedState`: The updated session state
+
+#### Security Considerations
+
+- Validates all key lengths before encryption
+- Ensures proper buffer sizes for MAC computation
+- Implements secure key handling
+- Uses constant-time operations for sensitive data
+
+### DecryptMessageAsync
+
+```csharp
+public async Task<(byte[] DecryptedMessage, SessionState UpdatedState)> DecryptMessageAsync(
+    SessionState sessionState,
+    SignalMessage message)
+```
+
+Decrypts a message using the Double Ratchet protocol with enhanced security features:
+
+- Secure MAC verification
+- Buffer overflow protection
+- Key length validation
+- Proper error handling
+
+#### Parameters
+
+- `sessionState`: The current session state containing cryptographic keys
+- `message`: The encrypted message to decrypt
+
+#### Returns
+
+- A tuple containing:
+  - `DecryptedMessage`: The decrypted message
+  - `UpdatedState`: The updated session state
+
+#### Security Considerations
+
+- Verifies MAC before decryption
+- Validates all key lengths
+- Implements secure buffer handling
+- Uses constant-time comparison for MAC verification 

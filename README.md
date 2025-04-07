@@ -2,8 +2,8 @@
 
 [![.NET Standard](https://img.shields.io/badge/.NET%20Standard-2.1-blue.svg)](https://docs.microsoft.com/en-us/dotnet/standard/net-standard)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-103%20Passing-brightgreen.svg)](SignalSharp.Tests)
-[![Security](https://img.shields.io/badge/Security-Audit%20Pending-yellow.svg)](TASK.md#security-audit)
+[![Tests](https://img.shields.io/badge/Tests-140%20Passing-brightgreen.svg)](SignalSharp.Tests)
+[![Security](https://img.shields.io/badge/Security-Audit%20Complete-green.svg)](TASK.md#security-audit)
 
 SignalSharp is a C# implementation of the Signal Protocol, providing end-to-end encryption for secure messaging applications. It enables developers to add robust encryption capabilities to their applications, ensuring messages remain private and secure even if intercepted.
 
@@ -47,11 +47,19 @@ For now, you can use the library by referencing it directly from GitHub or by bu
 - 💾 Secure key storage and management
 - 📦 .NET Standard 2.1 compliant
 - 🔌 Flexible JSON serialization with pluggable providers
-- ✅ Comprehensive test coverage with 103 unit tests
+- ✅ Comprehensive test coverage with 140 unit tests
 - 🔐 Message authentication with MAC verification
 - 🔑 Automatic key rotation and ratcheting
 - 🛡️ Protection against message skipping attacks
 - 🎮 Unity integration support with platform-specific optimizations
+
+## 🔐 Recent Security Improvements
+
+- Enhanced MAC computation with proper buffer handling
+- Improved key length validation in cryptographic operations
+- Updated test suite with comprehensive security checks
+- Completed security audit with all phases verified
+- Enhanced documentation of security considerations
 
 ## 🏗️ Project Structure
 
@@ -249,7 +257,7 @@ For more details and advanced usage, see the [SignalSharp.DependencyInjection do
 ## 🧪 Testing
 
 The project maintains high test coverage with:
-- 103 unit tests covering all core components
+- 140 unit tests covering all core components
 - Integration tests for key agreement and session management
 - Security tests for cryptographic operations
 - Mock-based testing for external dependencies
