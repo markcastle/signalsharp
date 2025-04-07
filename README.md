@@ -438,3 +438,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Signal Protocol specification
 - .NET Cryptography libraries
 - Contributors and maintainers 
+
+## 🚫 Export Control Notice
+
+⚠️ **Export Control Notice**
+This software may be subject to UK and international export control laws. 
+It is not intended for use in countries embargoed or sanctioned by the UK, US, or EU. 
+By downloading or using this software, you agree that you are not located in, under the control of, or a national/resident of any such country. 
