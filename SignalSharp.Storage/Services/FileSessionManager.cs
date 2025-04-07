@@ -53,12 +53,12 @@ namespace SignalSharp.Storage.Services
             if (remoteOneTimePreKey == null)
                 throw new ArgumentNullException(nameof(remoteOneTimePreKey));
 
-            var localIdentityKey = await _keyStore.GetAsync("local_identity_key");
-            var rootKey = await _keyStore.GetAsync("root_key");
-            var sendingChainKey = await _keyStore.GetAsync("sending_chain_key");
-            var receivingChainKey = await _keyStore.GetAsync("receiving_chain_key");
-            var sendingRatchetKey = await _keyStore.GetAsync("sending_ratchet_key");
-            var receivingRatchetKey = await _keyStore.GetAsync("receiving_ratchet_key");
+            string? localIdentityKey = await _keyStore.GetAsync("local_identity_key");
+            string? rootKey = await _keyStore.GetAsync("root_key");
+            string? sendingChainKey = await _keyStore.GetAsync("sending_chain_key");
+            string? receivingChainKey = await _keyStore.GetAsync("receiving_chain_key");
+            string? sendingRatchetKey = await _keyStore.GetAsync("sending_ratchet_key");
+            string? receivingRatchetKey = await _keyStore.GetAsync("receiving_ratchet_key");
 
             if (string.IsNullOrEmpty(localIdentityKey) || string.IsNullOrEmpty(rootKey) || 
                 string.IsNullOrEmpty(sendingChainKey) || string.IsNullOrEmpty(receivingChainKey) || 
@@ -67,7 +67,7 @@ namespace SignalSharp.Storage.Services
                 throw new InvalidOperationException("Required keys not found");
             }
 
-            var sessionState = new SessionState(
+            SessionState sessionState = new SessionState(
                 sessionId,
                 Convert.FromBase64String(localIdentityKey),
                 remoteIdentityKey,
@@ -88,11 +88,11 @@ namespace SignalSharp.Storage.Services
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            var sessionState = await GetSessionStateAsync(sessionId);
+            SessionState? sessionState = await GetSessionStateAsync(sessionId);
             if (sessionState == null)
                 throw new SessionNotFoundException($"Session {sessionId} not found", sessionId);
 
-            var decryptedMessage = await _encryptionService.DecryptAsync(message, sessionState.ReceivingChainKey);
+            byte[]? decryptedMessage = await _encryptionService.DecryptAsync(message, sessionState.ReceivingChainKey);
             sessionState.LastUsedAt = DateTime.UtcNow;
             await SaveSessionStateAsync(sessionState);
 
@@ -107,11 +107,11 @@ namespace SignalSharp.Storage.Services
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
 
-            var sessionState = await GetSessionStateAsync(sessionId);
+            SessionState? sessionState = await GetSessionStateAsync(sessionId);
             if (sessionState == null)
                 throw new SessionNotFoundException($"Session {sessionId} not found", sessionId);
 
-            var encryptedMessage = await _encryptionService.EncryptAsync(message, sessionState.SendingChainKey);
+            byte[]? encryptedMessage = await _encryptionService.EncryptAsync(message, sessionState.SendingChainKey);
             sessionState.LastUsedAt = DateTime.UtcNow;
             await SaveSessionStateAsync(sessionState);
 
@@ -124,7 +124,7 @@ namespace SignalSharp.Storage.Services
             if (string.IsNullOrEmpty(sessionId))
                 throw new ArgumentNullException(nameof(sessionId));
 
-            var filePath = Path.Combine(_storageDirectory, $"{sessionId}.json");
+            string? filePath = Path.Combine(_storageDirectory, $"{sessionId}.json");
             if (File.Exists(filePath))
             {
                 await Task.Run(() => File.Delete(filePath));
@@ -137,11 +137,11 @@ namespace SignalSharp.Storage.Services
             if (string.IsNullOrEmpty(sessionId))
                 throw new ArgumentNullException(nameof(sessionId));
 
-            var filePath = Path.Combine(_storageDirectory, $"{sessionId}.json");
+            string? filePath = Path.Combine(_storageDirectory, $"{sessionId}.json");
             if (!File.Exists(filePath))
                 return null;
 
-            var json = await File.ReadAllTextAsync(filePath);
+            string? json = await File.ReadAllTextAsync(filePath);
             return _jsonSerializer.Deserialize<SessionState>(json);
         }
 
@@ -151,8 +151,8 @@ namespace SignalSharp.Storage.Services
             if (sessionState == null)
                 throw new ArgumentNullException(nameof(sessionState));
 
-            var filePath = Path.Combine(_storageDirectory, $"{sessionState.SessionId}.json");
-            var json = _jsonSerializer.Serialize(sessionState);
+            string? filePath = Path.Combine(_storageDirectory, $"{sessionState.SessionId}.json");
+            string? json = _jsonSerializer.Serialize(sessionState);
             await File.WriteAllTextAsync(filePath, json);
         }
     }

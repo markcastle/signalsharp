@@ -162,15 +162,15 @@ namespace SignalSharp.Tests.Core
         {
             // Arrange
             string sessionId = "test-session";
-            byte[] localIdentityKey = new byte[] { 1, 2, 3 };
-            byte[] remoteIdentityKey = new byte[] { 4, 5, 6 };
-            byte[] rootKey = new byte[] { 7, 8, 9 };
-            byte[] sendingChainKey = new byte[] { 10, 11, 12 };
-            byte[] receivingChainKey = new byte[] { 13, 14, 15 };
-            byte[] sendingRatchetKey = new byte[] { 16, 17, 18 };
-            byte[] receivingRatchetKey = new byte[] { 19, 20, 21 };
-            byte[] message = new byte[] { 22, 23, 24 };
-            byte[] decryptedMessage = new byte[] { 25, 26, 27 };
+            byte[] localIdentityKey = { 1, 2, 3 };
+            byte[] remoteIdentityKey = { 4, 5, 6 };
+            byte[] rootKey = { 7, 8, 9 };
+            byte[] sendingChainKey = { 10, 11, 12 };
+            byte[] receivingChainKey = { 13, 14, 15 };
+            byte[] sendingRatchetKey = { 16, 17, 18 };
+            byte[] receivingRatchetKey = { 19, 20, 21 };
+            byte[] message = { 22, 23, 24 };
+            byte[] decryptedMessage = { 25, 26, 27 };
 
             SessionState sessionState = new(
                 sessionId,
@@ -227,15 +227,15 @@ namespace SignalSharp.Tests.Core
         {
             // Arrange
             string sessionId = "test-session";
-            byte[] localIdentityKey = new byte[] { 1, 2, 3 };
-            byte[] remoteIdentityKey = new byte[] { 4, 5, 6 };
-            byte[] rootKey = new byte[] { 7, 8, 9 };
-            byte[] sendingChainKey = new byte[] { 10, 11, 12 };
-            byte[] receivingChainKey = new byte[] { 13, 14, 15 };
-            byte[] sendingRatchetKey = new byte[] { 16, 17, 18 };
-            byte[] receivingRatchetKey = new byte[] { 19, 20, 21 };
-            byte[] message = new byte[] { 22, 23, 24 };
-            byte[] ciphertext = new byte[] { 25, 26, 27 };
+            byte[] localIdentityKey = { 1, 2, 3 };
+            byte[] remoteIdentityKey = { 4, 5, 6 };
+            byte[] rootKey = { 7, 8, 9 };
+            byte[] sendingChainKey = { 10, 11, 12 };
+            byte[] receivingChainKey = { 13, 14, 15 };
+            byte[] sendingRatchetKey = { 16, 17, 18 };
+            byte[] receivingRatchetKey = { 19, 20, 21 };
+            byte[] message = { 22, 23, 24 };
+            byte[] ciphertext = { 25, 26, 27 };
 
             SignalMessage encryptedMessage = new()
             {

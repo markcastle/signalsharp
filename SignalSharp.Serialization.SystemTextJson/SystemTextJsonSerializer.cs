@@ -49,7 +49,7 @@ namespace SignalSharp.Serialization.SystemTextJson
             if (string.IsNullOrEmpty(json))
                 throw new ArgumentNullException(nameof(json));
 
-            var result = JsonSerializer.Deserialize<T>(json, _options);
+            T? result = JsonSerializer.Deserialize<T>(json, _options);
             if (result == null)
                 throw new InvalidOperationException($"Failed to deserialize JSON to type {typeof(T).Name}");
 
@@ -62,7 +62,7 @@ namespace SignalSharp.Serialization.SystemTextJson
             if (string.IsNullOrEmpty(json))
                 throw new ArgumentNullException(nameof(json));
 
-            var result = JsonSerializer.Deserialize<T>(json, _options);
+            T? result = JsonSerializer.Deserialize<T>(json, _options);
             if (result == null)
                 throw new InvalidOperationException($"Failed to deserialize JSON to type {typeof(T).Name}");
 

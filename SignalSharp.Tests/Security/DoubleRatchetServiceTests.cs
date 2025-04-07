@@ -1,22 +1,50 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Moq;
 using SignalSharp.Core.Interfaces;
 using SignalSharp.Core.Models;
 using SignalSharp.Security.Services;
-using Xunit;
-using System.Threading;
 
 namespace SignalSharp.Tests.Security
 {
+    /// <summary>
+    /// Test suite for the DoubleRatchetService which implements the Signal protocol's Double Ratchet algorithm.
+    /// </summary>
+    /// <remarks>
+    /// These tests verify that the Double Ratchet implementation correctly:
+    /// - Initializes new cryptographic sessions
+    /// - Encrypts messages with forward secrecy
+    /// - Decrypts messages with proper authentication
+    /// - Performs cryptographic ratcheting operations 
+    /// - Updates session state during message exchange
+    /// 
+    /// The Double Ratchet algorithm is a critical security component that provides
+    /// both forward secrecy and break-in recovery for secure communications.
+    /// </remarks>
     public class DoubleRatchetServiceTests
     {
+        /// <summary>
+        /// Mock of the elliptic curve key exchange service used for shared secret generation.
+        /// </summary>
         private readonly Mock<IEcKeyExchangeService> _keyExchangeServiceMock;
+
+        /// <summary>
+        /// Mock of the encryption service used for symmetric encryption operations.
+        /// </summary>
         private readonly Mock<IEncryptionService> _encryptionServiceMock;
+
+        /// <summary>
+        /// Mock of the hash service used for key derivation and message authentication.
+        /// </summary>
         private readonly Mock<IHashService> _hashServiceMock;
+
+        /// <summary>
+        /// The DoubleRatchetService instance being tested.
+        /// </summary>
         private readonly IDoubleRatchetService _doubleRatchetService;
 
+        /// <summary>
+        /// Initializes a new instance of the DoubleRatchetServiceTests class.
+        /// Sets up all the required mock dependencies and creates the DoubleRatchetService for testing.
+        /// </summary>
         public DoubleRatchetServiceTests()
         {
             _keyExchangeServiceMock = new Mock<IEcKeyExchangeService>();
@@ -28,16 +56,29 @@ namespace SignalSharp.Tests.Security
                 _hashServiceMock.Object);
         }
 
+        /// <summary>
+        /// Tests that a new session state can be initialized with proper cryptographic keys.
+        /// </summary>
+        /// <remarks>
+        /// This test verifies the session initialization process which includes:
+        /// 1. Computing shared secrets from ratchet keys
+        /// 2. Generating new ratchet key pairs
+        /// 3. Deriving chain keys from shared secrets
+        /// 4. Creating a properly structured session state
+        /// 
+        /// Session initialization is the first step in establishing secure communication
+        /// and creates the initial cryptographic state for the Double Ratchet algorithm.
+        /// </remarks>
         [Fact]
         public async Task InitializeSessionAsync_ShouldCreateSessionState()
         {
             // Arrange
-            var rootKey = new byte[] { 1, 2, 3 };
-            var sendingRatchetKey = new byte[] { 4, 5, 6 };
-            var receivingRatchetKey = new byte[] { 7, 8, 9 };
-            var sharedSecret = new byte[] { 10, 11, 12 };
-            var sendingChainKey = new byte[] { 13, 14, 15 };
-            var receivingChainKey = new byte[] { 16, 17, 18 };
+            byte[] rootKey = { 1, 2, 3 };
+            byte[] sendingRatchetKey = { 4, 5, 6 };
+            byte[] receivingRatchetKey = { 7, 8, 9 };
+            byte[] sharedSecret = { 10, 11, 12 };
+            byte[] sendingChainKey = { 13, 14, 15 };
+            byte[] receivingChainKey = { 16, 17, 18 };
 
             _keyExchangeServiceMock
                 .Setup(x => x.ComputeSharedSecretAsync(It.IsAny<byte[]>(), It.IsAny<byte[]>()))
@@ -62,7 +103,7 @@ namespace SignalSharp.Tests.Security
                 .ReturnsAsync(receivingChainKey);
 
             // Act
-            var result = await _doubleRatchetService.InitializeSessionAsync(rootKey, sendingRatchetKey, receivingRatchetKey);
+            SessionState result = await _doubleRatchetService.InitializeSessionAsync(rootKey, sendingRatchetKey, receivingRatchetKey);
 
             // Assert
             Assert.NotNull(result);
@@ -73,24 +114,40 @@ namespace SignalSharp.Tests.Security
             Assert.Equal(receivingChainKey, result.ReceivingChainKey);
         }
 
+        /// <summary>
+        /// Tests that messages can be properly encrypted using the Double Ratchet algorithm.
+        /// </summary>
+        /// <remarks>
+        /// This test verifies the message encryption process which includes:
+        /// 1. Deriving message keys from the sending chain key
+        /// 2. Advancing the chain key through ratcheting
+        /// 3. Encrypting the message with the derived message key
+        /// 4. Computing a message authentication code (MAC)
+        /// 5. Updating the session state
+        /// 
+        /// The encryption process creates a new message key for each message, providing
+        /// forward secrecy by ensuring that compromise of one message does not compromise
+        /// future messages. The test ensures that the session state is properly updated
+        /// to reflect the advancement of the ratchet.
+        /// </remarks>
         [Fact]
         public async Task EncryptMessageAsync_ShouldEncryptMessageAndComputeHash()
         {
             // Arrange
-            var sessionId = "test-session";
-            var localIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteIdentityKey = new byte[] { 4, 5, 6 };
-            var rootKey = new byte[] { 7, 8, 9 };
-            var sendingChainKey = new byte[] { 10, 11, 12 };
-            var receivingChainKey = new byte[] { 13, 14, 15 };
-            var sendingRatchetKey = new byte[] { 16, 17, 18 };
-            var receivingRatchetKey = new byte[] { 19, 20, 21 };
-            var message = new byte[] { 22, 23, 24 };
-            var ciphertext = new byte[] { 25, 26, 27 };
-            var mac = new byte[] { 28, 29, 30 };
-            var sharedSecret = new byte[] { 31, 32, 33 };
+            string sessionId = "test-session";
+            byte[] localIdentityKey = { 1, 2, 3 };
+            byte[] remoteIdentityKey = { 4, 5, 6 };
+            byte[] rootKey = { 7, 8, 9 };
+            byte[] sendingChainKey = { 10, 11, 12 };
+            byte[] receivingChainKey = { 13, 14, 15 };
+            byte[] sendingRatchetKey = { 16, 17, 18 };
+            byte[] receivingRatchetKey = { 19, 20, 21 };
+            byte[] message = { 22, 23, 24 };
+            byte[] ciphertext = { 25, 26, 27 };
+            byte[] mac = { 28, 29, 30 };
+            byte[] sharedSecret = { 31, 32, 33 };
 
-            var sessionState = new SessionState(
+            SessionState sessionState = new(
                 sessionId,
                 localIdentityKey,
                 remoteIdentityKey,
@@ -104,8 +161,8 @@ namespace SignalSharp.Tests.Security
                 .Setup(x => x.ComputeSharedSecretAsync(sendingRatchetKey, receivingRatchetKey))
                 .ReturnsAsync(sharedSecret);
 
-            var newChainKey = new byte[] { 34, 35, 36 };
-            var messageKey = new byte[] { 37, 38, 39 };
+            byte[] newChainKey = { 34, 35, 36 };
+            byte[] messageKey = { 37, 38, 39 };
 
             _hashServiceMock
                 .Setup(x => x.DeriveKeyAsync(
@@ -129,15 +186,8 @@ namespace SignalSharp.Tests.Security
                 .Setup(x => x.ComputeKeyedHashAsync(ciphertext, sendingChainKey))
                 .ReturnsAsync(mac);
 
-            var signalMessage = new SignalMessage
-            {
-                Ciphertext = ciphertext,
-                MessageNumber = 0,
-                RatchetKey = sendingRatchetKey
-            };
-
             // Act
-            var (result, updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
+            (SignalMessage? result, SessionState? updatedState) = await _doubleRatchetService.EncryptMessageAsync(sessionState, message);
 
             // Assert
             Assert.NotNull(result);
@@ -148,25 +198,40 @@ namespace SignalSharp.Tests.Security
             Assert.Equal(receivingChainKey, updatedState.ReceivingChainKey);
         }
 
+        /// <summary>
+        /// Tests that messages can be properly decrypted and authenticated using the Double Ratchet algorithm.
+        /// </summary>
+        /// <remarks>
+        /// This test verifies the message decryption process which includes:
+        /// 1. Deriving message keys from the receiving chain key
+        /// 2. Verifying the message authentication code (MAC)
+        /// 3. Decrypting the message with the derived message key
+        /// 4. Advancing the receiving chain key through ratcheting
+        /// 5. Updating the session state
+        /// 
+        /// The decryption process ensures that messages can only be read by the intended
+        /// recipient and that the messages have not been tampered with. The test also
+        /// ensures that the session state is properly updated after decryption.
+        /// </remarks>
         [Fact]
         public async Task DecryptMessageAsync_ShouldVerifyHashAndDecryptMessage()
         {
             // Arrange
-            var sessionId = "test-session";
-            var localIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteIdentityKey = new byte[] { 4, 5, 6 };
-            var rootKey = new byte[] { 7, 8, 9 };
-            var sendingChainKey = new byte[] { 10, 11, 12 };
-            var receivingChainKey = new byte[] { 13, 14, 15 };
-            var sendingRatchetKey = new byte[] { 16, 17, 18 };
-            var receivingRatchetKey = new byte[] { 19, 20, 21 };
-            var ciphertext = new byte[] { 22, 23, 24 };
-            var mac = new byte[] { 25, 26, 27 };
-            var messageKey = new byte[] { 37, 38, 39 };
-            var newChainKey = new byte[] { 34, 35, 36 };
-            var plaintext = new byte[] { 40, 41, 42 };
+            string sessionId = "test-session";
+            byte[] localIdentityKey = { 1, 2, 3 };
+            byte[] remoteIdentityKey = { 4, 5, 6 };
+            byte[] rootKey = { 7, 8, 9 };
+            byte[] sendingChainKey = { 10, 11, 12 };
+            byte[] receivingChainKey = { 13, 14, 15 };
+            byte[] sendingRatchetKey = { 16, 17, 18 };
+            byte[] receivingRatchetKey = { 19, 20, 21 };
+            byte[] ciphertext = { 22, 23, 24 };
+            byte[] mac = { 25, 26, 27 };
+            byte[] messageKey = { 37, 38, 39 };
+            byte[] newChainKey = { 34, 35, 36 };
+            byte[] plaintext = { 40, 41, 42 };
 
-            var sessionState = new SessionState(
+            SessionState sessionState = new(
                 sessionId,
                 localIdentityKey,
                 remoteIdentityKey,
@@ -202,7 +267,7 @@ namespace SignalSharp.Tests.Security
                 .Setup(x => x.DecryptAsync(ciphertext, messageKey))
                 .ReturnsAsync(plaintext);
 
-            var signalMessage = new SignalMessage
+            SignalMessage signalMessage = new()
             {
                 Ciphertext = ciphertext,
                 Mac = mac,
@@ -211,7 +276,7 @@ namespace SignalSharp.Tests.Security
             };
 
             // Act
-            var (decryptedMessage, updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
+            (byte[]? decryptedMessage, SessionState? updatedState) = await _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage);
 
             // Assert
             Assert.NotNull(decryptedMessage);
@@ -220,22 +285,34 @@ namespace SignalSharp.Tests.Security
             Assert.Equal(sendingChainKey, updatedState.SendingChainKey);
         }
 
+        /// <summary>
+        /// Tests that message decryption fails with appropriate exception when message authentication fails.
+        /// </summary>
+        /// <remarks>
+        /// This test verifies the security behavior when presented with potentially tampered messages:
+        /// 1. The MAC verification fails, indicating message tampering or corruption
+        /// 2. The decryption operation should throw an exception rather than process invalid data
+        /// 
+        /// This security check is critical for preventing attacks where an adversary
+        /// might attempt to modify messages in transit. The test ensures that the
+        /// implementation properly rejects messages that fail integrity verification.
+        /// </remarks>
         [Fact]
         public async Task DecryptMessageAsync_ShouldThrowIfHashVerificationFails()
         {
             // Arrange
-            var sessionId = "test-session";
-            var localIdentityKey = new byte[32];
-            var remoteIdentityKey = new byte[32];
-            var rootKey = new byte[32];
-            var sendingChainKey = new byte[32];
-            var receivingChainKey = new byte[32];
-            var sendingRatchetKey = new byte[32];
-            var receivingRatchetKey = new byte[32];
-            var ciphertext = new byte[32];
-            var mac = new byte[32];
-            var sharedSecret = new byte[32];
-            var newChainKey = new byte[32];
+            string sessionId = "test-session";
+            byte[] localIdentityKey = new byte[32];
+            byte[] remoteIdentityKey = new byte[32];
+            byte[] rootKey = new byte[32];
+            byte[] sendingChainKey = new byte[32];
+            byte[] receivingChainKey = new byte[32];
+            byte[] sendingRatchetKey = new byte[32];
+            byte[] receivingRatchetKey = new byte[32];
+            byte[] ciphertext = new byte[32];
+            byte[] mac = new byte[32];
+            byte[] sharedSecret = new byte[32];
+            byte[] newChainKey = new byte[32];
 
             // Initialize the arrays with non-zero values
             new Random().NextBytes(localIdentityKey);
@@ -250,7 +327,7 @@ namespace SignalSharp.Tests.Security
             new Random().NextBytes(sharedSecret);
             new Random().NextBytes(newChainKey);
 
-            var sessionState = new SessionState(
+            SessionState sessionState = new(
                 sessionId,
                 localIdentityKey,
                 remoteIdentityKey,
@@ -272,7 +349,7 @@ namespace SignalSharp.Tests.Security
                 .Setup(x => x.VerifyKeyedHashAsync(ciphertext, newChainKey, mac))
                 .ReturnsAsync(false);
 
-            var signalMessage = new SignalMessage
+            SignalMessage signalMessage = new()
             {
                 Ciphertext = ciphertext,
                 Mac = mac,
@@ -287,22 +364,37 @@ namespace SignalSharp.Tests.Security
                 () => _doubleRatchetService.DecryptMessageAsync(sessionState, signalMessage));
         }
 
+        /// <summary>
+        /// Tests that the sending ratchet correctly advances when triggered.
+        /// </summary>
+        /// <remarks>
+        /// This test verifies the ratchet advancement process which includes:
+        /// 1. Generating new ratchet key pairs
+        /// 2. Computing a new shared secret with the recipient's ratchet key
+        /// 3. Deriving new chain keys from the shared secret
+        /// 4. Updating the session state with the new keys
+        /// 
+        /// The ratchet advancement is a key component of the Double Ratchet algorithm,
+        /// providing break-in recovery by ensuring that compromise of current keys 
+        /// cannot be used to decrypt future messages. This test ensures that the 
+        /// cryptographic state evolves correctly during communication.
+        /// </remarks>
         [Fact]
         public async Task RatchetSendingAsync_ShouldUpdateChainKeys()
         {
             // Arrange
-            var sessionId = "test-session";
-            var localIdentityKey = new byte[32];
-            var remoteIdentityKey = new byte[32];
-            var rootKey = new byte[32];
-            var sendingChainKey = new byte[32];
-            var receivingChainKey = new byte[32];
-            var sendingRatchetKey = new byte[32];
-            var receivingRatchetKey = new byte[32];
-            var newRatchetKey = new byte[32];
-            var sharedSecret = new byte[32];
-            var newSendingChainKey = new byte[32];
-            var newReceivingChainKey = new byte[32];
+            string sessionId = "test-session";
+            byte[] localIdentityKey = new byte[32];
+            byte[] remoteIdentityKey = new byte[32];
+            byte[] rootKey = new byte[32];
+            byte[] sendingChainKey = new byte[32];
+            byte[] receivingChainKey = new byte[32];
+            byte[] sendingRatchetKey = new byte[32];
+            byte[] receivingRatchetKey = new byte[32];
+            byte[] newRatchetKey = new byte[32];
+            byte[] sharedSecret = new byte[32];
+            byte[] newSendingChainKey = new byte[32];
+            byte[] newReceivingChainKey = new byte[32];
 
             // Initialize the arrays with non-zero values
             new Random().NextBytes(localIdentityKey);
@@ -317,7 +409,7 @@ namespace SignalSharp.Tests.Security
             new Random().NextBytes(newSendingChainKey);
             new Random().NextBytes(newReceivingChainKey);
 
-            var sessionState = new SessionState(
+            SessionState sessionState = new(
                 sessionId,
                 localIdentityKey,
                 remoteIdentityKey,
@@ -340,7 +432,7 @@ namespace SignalSharp.Tests.Security
                 .ReturnsAsync(newSendingChainKey);
 
             // Act
-            var result = await _doubleRatchetService.RatchetSendingAsync(sessionState);
+            SessionState result = await _doubleRatchetService.RatchetSendingAsync(sessionState);
 
             // Assert
             Assert.NotNull(result);
@@ -351,4 +443,4 @@ namespace SignalSharp.Tests.Security
             Assert.Equal(receivingRatchetKey, result.ReceivingRatchetKey);
         }
     }
-} 
+}

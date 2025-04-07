@@ -53,10 +53,10 @@ namespace SignalSharp.Tests.Storage
         public async Task CreateSessionAsync_WithValidParameters_ShouldCreateSession()
         {
             // Arrange
-            var sessionId = "test-session";
-            var remoteIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteSignedPreKey = new byte[] { 4, 5, 6 };
-            var remoteOneTimePreKey = new byte[] { 7, 8, 9 };
+            string? sessionId = "test-session";
+            byte[]? remoteIdentityKey = { 1, 2, 3 };
+            byte[]? remoteSignedPreKey = { 4, 5, 6 };
+            byte[]? remoteOneTimePreKey = { 7, 8, 9 };
 
             // Act
             await _sessionManager.CreateSessionAsync(sessionId, remoteIdentityKey, remoteSignedPreKey, remoteOneTimePreKey);
@@ -69,18 +69,18 @@ namespace SignalSharp.Tests.Storage
         public async Task ProcessIncomingMessageAsync_WithValidMessage_ShouldDecryptMessage()
         {
             // Arrange
-            var sessionId = "test-session";
-            var localIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteIdentityKey = new byte[] { 4, 5, 6 };
-            var rootKey = new byte[] { 7, 8, 9 };
-            var sendingChainKey = new byte[] { 10, 11, 12 };
-            var receivingChainKey = new byte[] { 13, 14, 15 };
-            var sendingRatchetKey = new byte[] { 16, 17, 18 };
-            var receivingRatchetKey = new byte[] { 19, 20, 21 };
-            var message = new byte[] { 22, 23, 24 };
-            var decryptedMessage = new byte[] { 25, 26, 27 };
+            string? sessionId = "test-session";
+            byte[]? localIdentityKey = { 1, 2, 3 };
+            byte[]? remoteIdentityKey = { 4, 5, 6 };
+            byte[]? rootKey = { 7, 8, 9 };
+            byte[]? sendingChainKey = { 10, 11, 12 };
+            byte[]? receivingChainKey = { 13, 14, 15 };
+            byte[]? sendingRatchetKey = { 16, 17, 18 };
+            byte[]? receivingRatchetKey = { 19, 20, 21 };
+            byte[]? message = { 22, 23, 24 };
+            byte[]? decryptedMessage = { 25, 26, 27 };
 
-            var sessionState = new SessionState(
+            SessionState? sessionState = new(
                 sessionId,
                 localIdentityKey,
                 remoteIdentityKey,
@@ -90,8 +90,8 @@ namespace SignalSharp.Tests.Storage
                 sendingRatchetKey,
                 receivingRatchetKey);
 
-            var filePath = Path.Combine(_testDirectory, $"{sessionId}.json");
-            var serializedState = JsonSerializer.Serialize(sessionState);
+            string? filePath = Path.Combine(_testDirectory, $"{sessionId}.json");
+            string? serializedState = JsonSerializer.Serialize(sessionState);
             _jsonSerializerMock.Setup(x => x.Serialize(It.IsAny<SessionState>()))
                 .Returns(serializedState);
             _jsonSerializerMock.Setup(x => x.Deserialize<SessionState>(serializedState))
@@ -102,7 +102,7 @@ namespace SignalSharp.Tests.Storage
                 .ReturnsAsync(decryptedMessage);
 
             // Act
-            var result = await _sessionManager.ProcessIncomingMessageAsync(sessionId, message);
+            byte[]? result = await _sessionManager.ProcessIncomingMessageAsync(sessionId, message);
 
             // Assert
             Assert.NotNull(result);
@@ -113,18 +113,18 @@ namespace SignalSharp.Tests.Storage
         public async Task EncryptMessageAsync_WithValidMessage_ShouldEncryptMessage()
         {
             // Arrange
-            var sessionId = "test-session";
-            var localIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteIdentityKey = new byte[] { 4, 5, 6 };
-            var rootKey = new byte[] { 7, 8, 9 };
-            var sendingChainKey = new byte[] { 10, 11, 12 };
-            var receivingChainKey = new byte[] { 13, 14, 15 };
-            var sendingRatchetKey = new byte[] { 16, 17, 18 };
-            var receivingRatchetKey = new byte[] { 19, 20, 21 };
-            var message = new byte[] { 22, 23, 24 };
-            var encryptedBytes = new byte[] { 25, 26, 27 };
+            string? sessionId = "test-session";
+            byte[]? localIdentityKey = { 1, 2, 3 };
+            byte[]? remoteIdentityKey = { 4, 5, 6 };
+            byte[]? rootKey = { 7, 8, 9 };
+            byte[]? sendingChainKey = { 10, 11, 12 };
+            byte[]? receivingChainKey = { 13, 14, 15 };
+            byte[]? sendingRatchetKey = { 16, 17, 18 };
+            byte[]? receivingRatchetKey = { 19, 20, 21 };
+            byte[]? message = { 22, 23, 24 };
+            byte[]? encryptedBytes = { 25, 26, 27 };
 
-            var sessionState = new SessionState(
+            SessionState? sessionState = new(
                 sessionId,
                 localIdentityKey,
                 remoteIdentityKey,
@@ -134,8 +134,8 @@ namespace SignalSharp.Tests.Storage
                 sendingRatchetKey,
                 receivingRatchetKey);
 
-            var filePath = Path.Combine(_testDirectory, $"{sessionId}.json");
-            var serializedState = JsonSerializer.Serialize(sessionState);
+            string? filePath = Path.Combine(_testDirectory, $"{sessionId}.json");
+            string? serializedState = JsonSerializer.Serialize(sessionState);
             _jsonSerializerMock.Setup(x => x.Serialize(It.IsAny<SessionState>()))
                 .Returns(serializedState);
             _jsonSerializerMock.Setup(x => x.Deserialize<SessionState>(serializedState))
@@ -146,7 +146,7 @@ namespace SignalSharp.Tests.Storage
                 .ReturnsAsync(encryptedBytes);
 
             // Act
-            var result = await _sessionManager.EncryptMessageAsync(sessionId, message);
+            byte[]? result = await _sessionManager.EncryptMessageAsync(sessionId, message);
 
             // Assert
             Assert.NotNull(result);
@@ -157,13 +157,13 @@ namespace SignalSharp.Tests.Storage
         public async Task DeleteSessionAsync_WithExistingSession_ShouldDeleteSession()
         {
             // Arrange
-            var sessionId = "test-session";
-            var remoteIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteSignedPreKey = new byte[] { 4, 5, 6 };
-            var remoteOneTimePreKey = new byte[] { 7, 8, 9 };
+            string? sessionId = "test-session";
+            byte[]? remoteIdentityKey = { 1, 2, 3 };
+            byte[]? remoteSignedPreKey = { 4, 5, 6 };
+            byte[]? remoteOneTimePreKey = { 7, 8, 9 };
 
             await _sessionManager.CreateSessionAsync(sessionId, remoteIdentityKey, remoteSignedPreKey, remoteOneTimePreKey);
-            var filePath = Path.Combine(_testDirectory, $"{sessionId}.json");
+            string? filePath = Path.Combine(_testDirectory, $"{sessionId}.json");
 
             // Act
             await _sessionManager.DeleteSessionAsync(sessionId);
@@ -176,10 +176,10 @@ namespace SignalSharp.Tests.Storage
         public async Task CreateSessionAsync_WithNullRemoteIdentityKey_ShouldThrowArgumentNullException()
         {
             // Arrange
-            var sessionId = "test-session";
+            string? sessionId = "test-session";
             byte[]? remoteIdentityKey = null;
-            var remoteSignedPreKey = new byte[] { 4, 5, 6 };
-            var remoteOneTimePreKey = new byte[] { 7, 8, 9 };
+            byte[]? remoteSignedPreKey = { 4, 5, 6 };
+            byte[]? remoteOneTimePreKey = { 7, 8, 9 };
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
@@ -191,7 +191,7 @@ namespace SignalSharp.Tests.Storage
         {
             // Arrange
             string? sessionId = null;
-            var message = new byte[] { 1, 2, 3 };
+            byte[]? message = { 1, 2, 3 };
 
             // Act & Assert
             await Assert.ThrowsAsync<ArgumentNullException>(() =>
@@ -202,14 +202,14 @@ namespace SignalSharp.Tests.Storage
         public async Task GetSessionStateAsync_WithExistingSession_ReturnsState()
         {
             // Arrange
-            var sessionId = "test-session";
-            var remoteIdentityKey = new byte[] { 1, 2, 3 };
-            var remoteSignedPreKey = new byte[] { 4, 5, 6 };
-            var remoteOneTimePreKey = new byte[] { 7, 8, 9 };
+            string? sessionId = "test-session";
+            byte[]? remoteIdentityKey = { 1, 2, 3 };
+            byte[]? remoteSignedPreKey = { 4, 5, 6 };
+            byte[]? remoteOneTimePreKey = { 7, 8, 9 };
 
             await _sessionManager.CreateSessionAsync(sessionId, remoteIdentityKey, remoteSignedPreKey, remoteOneTimePreKey);
 
-            var expectedState = new SessionState(
+            SessionState? expectedState = new(
                 sessionId,
                 new byte[] { 10, 11, 12 },
                 remoteIdentityKey,
@@ -223,7 +223,7 @@ namespace SignalSharp.Tests.Storage
                 .Returns(expectedState);
 
             // Act
-            var result = await _sessionManager.GetSessionStateAsync(sessionId);
+            SessionState? result = await _sessionManager.GetSessionStateAsync(sessionId);
 
             // Assert
             Assert.NotNull(result);
