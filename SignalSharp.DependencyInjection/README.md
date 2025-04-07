@@ -1,8 +1,8 @@
-# SignalSharp.DependencyInjection
+# SignalSharp.DependencyInjection 🏗️
 
 This project provides dependency injection support for SignalSharp, making it easy to integrate SignalSharp into applications that use Microsoft's dependency injection framework.
 
-## Installation
+## 📦 Installation
 
 Install the SignalSharp.DependencyInjection package using the NuGet Package Manager:
 
@@ -10,9 +10,9 @@ Install the SignalSharp.DependencyInjection package using the NuGet Package Mana
 dotnet add package SignalSharp.DependencyInjection
 ```
 
-## Usage
+## 💻 Usage
 
-### Basic Usage
+### 🔰 Basic Usage
 
 Add SignalSharp services to your application's service collection:
 
@@ -26,7 +26,7 @@ public void ConfigureServices(IServiceCollection services)
 }
 ```
 
-### Configuration Options
+### ⚙️ Configuration Options
 
 The `AddSignalSharp` method accepts an action to configure the SignalSharp options:
 
@@ -52,7 +52,7 @@ services.AddSignalSharp(options =>
 });
 ```
 
-### Using the SignalSharpFactory
+### 🔧 Using the SignalSharpFactory
 
 The `SignalSharpFactory` class provides factory methods for common scenarios:
 
@@ -87,7 +87,7 @@ var decryptedMessage = await factory.DecryptMessageAsync(sessionId, encryptedMes
 await factory.DeleteSessionAsync(sessionId);
 ```
 
-### Custom Implementations
+### 🔌 Custom Implementations
 
 You can provide custom implementations for the key store, JSON serializer, and session manager:
 
@@ -108,9 +108,9 @@ services.AddSignalSharp(options =>
 });
 ```
 
-## Examples
+## 📝 Examples
 
-### ASP.NET Core Web API
+### 🌐 ASP.NET Core Web API
 
 ```csharp
 public class Startup
@@ -158,7 +158,7 @@ public class SignalController : ControllerBase
 }
 ```
 
-### Console Application
+### 🖥️ Console Application
 
 ```csharp
 class Program
@@ -200,6 +200,6 @@ class Program
 }
 ```
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details. 

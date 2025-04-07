@@ -122,7 +122,7 @@ await sessionManager.DeleteSessionAsync(sessionId);
 
 ### Advanced Usage
 
-#### Custom JSON Serialization
+#### 🔄 Custom JSON Serialization
 
 ```csharp
 // Using System.Text.Json
@@ -142,7 +142,7 @@ var jsonSettings = new JsonSerializerSettings
 var jsonSerializer = new NewtonsoftJsonSerializer(jsonSettings);
 ```
 
-#### Custom Key Storage
+#### 💾 Custom Key Storage
 
 ```csharp
 // Implement your own key storage
@@ -163,7 +163,7 @@ public class CustomKeyStore : IKeyStore
 }
 ```
 
-#### Dependency Injection Support
+#### 🏗️ Dependency Injection Support
 
 SignalSharp provides full dependency injection support through the `SignalSharp.DependencyInjection` package, making it easy to integrate into applications using Microsoft's dependency injection framework.
 
@@ -219,11 +219,11 @@ public class SignalService
 ```
 
 The DI package provides:
-- Easy configuration through options pattern
-- Factory methods for common operations
-- Support for custom implementations
-- Integration with ASP.NET Core and other DI-enabled applications
-- Automatic service registration and lifetime management
+- ⚙️ Easy configuration through options pattern
+- 🔧 Factory methods for common operations
+- 🔌 Support for custom implementations
+- 🌐 Integration with ASP.NET Core and other DI-enabled applications
+- 🔄 Automatic service registration and lifetime management
 
 For more details and advanced usage, see the [SignalSharp.DependencyInjection documentation](SignalSharp.DependencyInjection/README.md).
 
